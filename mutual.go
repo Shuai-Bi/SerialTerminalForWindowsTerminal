@@ -1,13 +1,12 @@
 package main
 
 import (
-	"bufio"
+	"bytes"
 	"fmt"
 	"github.com/trzsz/trzsz-go/trzsz"
 	"github.com/zimolab/charsetconv"
 	"go.bug.st/serial"
 	"io"
-	"log"
 	"os"
 	"strings"
 	"time"
@@ -15,9 +14,7 @@ import (
 
 var (
 	serialPort  serial.Port
-	in          io.Reader = os.Stdin
 	out         io.Writer = os.Stdout
-	outs                  = []io.Writer{os.Stdout}
 	trzszFilter *trzsz.TrzszFilter
 	clientIn    *io.PipeReader
 	stdoutPipe  *io.PipeReader
@@ -25,61 +22,30 @@ var (
 	clientOut   *io.PipeWriter
 )
 
-func input(in io.Reader) {
-	var err error
-	input := bufio.NewScanner(in)
-	var ok = false
-	for {
-		input.Scan()
-		ok = false
-		args = strings.Split(input.Text(), " ")
-		for _, cmd := range commands {
-			if strings.Compare(strings.TrimSpace(args[0]), cmd.name) == 0 {
-				cmd.function()
-				ok = true
-			}
-		}
-		if !ok {
-			_, err := io.WriteString(stdinPipe, input.Text())
-			if err != nil {
-				log.Fatal(err)
-			}
-			_, err = io.WriteString(stdinPipe, config.endStr)
-			if err != nil {
-				log.Fatal(err)
-			}
-		}
-		err = serialPort.Drain()
-		ErrorF(err)
+func convertChunk(chunk []byte, srcCode, dstCode string) ([]byte, error) {
+	if len(chunk) == 0 {
+		return nil, nil
 	}
+
+	if strings.EqualFold(srcCode, dstCode) {
+		dup := make([]byte, len(chunk))
+		copy(dup, chunk)
+		return dup, nil
+	}
+
+	var buf bytes.Buffer
+	err := charsetconv.ConvertWith(bytes.NewReader(chunk), charsetconv.Charset(srcCode), &buf, charsetconv.Charset(dstCode), false)
+	if err != nil {
+		return nil, err
+	}
+
+	return buf.Bytes(), nil
 }
 
-func strout(out io.Writer, cs, str string) {
-	err := charsetconv.EncodeWith(strings.NewReader(str), out, charsetconv.Charset(cs), false)
-	ErrorF(err)
-}
-
-func output() {
-	var err error
-	if strings.Compare(config.inputCode, "hex") == 0 {
-		b := make([]byte, config.frameSize)
-		r, _ := io.LimitReader(stdoutPipe, int64(config.frameSize)).Read(b)
-		if r != 0 {
-			if config.timesTamp {
-				strout(out, config.outputCode, fmt.Sprintf("%v % X %q \n", time.Now().Format(config.timesFmt), b, b))
-			} else {
-				strout(out, config.outputCode, fmt.Sprintf("% X %q \n", b, b))
-			}
-		}
-	} else {
-		if config.timesTamp {
-			line, _, _ := bufio.NewReader(stdoutPipe).ReadLine()
-			if line != nil {
-				strout(out, config.outputCode, fmt.Sprintf("%v %s\n", time.Now().Format(config.timesFmt), line))
-			}
-		} else {
-			err = charsetconv.ConvertWith(stdoutPipe, charsetconv.Charset(config.inputCode), out, charsetconv.Charset(config.outputCode), false)
-		}
+func formatHexFrame(frame []byte, withTimestamp bool, tsFmt string) string {
+	if withTimestamp {
+		return fmt.Sprintf("%v % X %q \n", time.Now().Format(tsFmt), frame, frame)
 	}
-	ErrorP(err)
+
+	return fmt.Sprintf("% X %q \n", frame, frame)
 }

@@ -6,18 +6,17 @@ import (
 	"go.bug.st/serial"
 	"golang.org/x/term"
 	"io"
-	"log"
-	"net"
 	"os"
 	"os/signal"
 	"runtime"
 	"strings"
+	"sync"
 )
 
 func checkPortAvailability(name string) ([]string, error) {
 	ports, err := serial.GetPortsList()
 	if err != nil {
-		log.Fatal(err)
+		return nil, err
 	}
 	if len(ports) == 0 {
 		return nil, fmt.Errorf("无串口")
@@ -33,26 +32,31 @@ func checkPortAvailability(name string) ([]string, error) {
 	return ports, fmt.Errorf("串口 " + name + " 未在线")
 }
 
-func OpenSerial() {
-	var err error
+func OpenSerial() error {
 	mode := &serial.Mode{
 		BaudRate: config.baudRate,
 		StopBits: serial.StopBits(config.stopBits),
 		DataBits: config.dataBits,
 		Parity:   serial.Parity(config.parityBit),
 	}
+	var err error
 	serialPort, err = serial.Open(config.portName, mode)
-	ErrorF(err)
-	return
+	return err
 }
 
 func CloseSerial() {
-	err := serialPort.Close()
-	ErrorF(err)
-	return
+	if serialPort == nil {
+		return
+	}
+
+	if err := serialPort.Close(); err != nil {
+		fmt.Fprint(os.Stderr, err)
+		fmt.Fprint(os.Stderr, "\n")
+	}
 }
 
 var termch chan os.Signal
+var termchOnce sync.Once
 
 // OpenTrzsz create a TrzszFilter to support trzsz ( trz / tsz ).
 //
@@ -61,13 +65,12 @@ var termch chan os.Signal
 // │ mutual │              │ Client │              │ TrzszFilter │              │ Serial │
 // │        │◄─────────────│        │◄─────────────┤             │◄─────────────┤        │
 // └────────┘   stdoutPipe └────────┘   ClientOut  └─────────────┘   SerialOut  └────────┘
-func OpenTrzsz() {
+func OpenTrzsz() error {
 	fd := int(os.Stdin.Fd())
 	width, _, err := term.GetSize(fd)
 	if err != nil {
 		if runtime.GOOS != "windows" {
-			fmt.Printf("term get size failed: %s\n", err)
-			return
+			return fmt.Errorf("term get size failed: %w", err)
 		}
 		width = 80
 	}
@@ -78,6 +81,8 @@ func OpenTrzsz() {
 		trzsz.TrzszOptions{TerminalColumns: int32(width), EnableZmodem: true})
 	trzsz.SetAffectedByWindows(false)
 	termch = make(chan os.Signal, 1)
+	termchOnce = sync.Once{}
+
 	go func() {
 		for range termch {
 			width, _, err := term.GetSize(fd)
@@ -88,38 +93,18 @@ func OpenTrzsz() {
 			trzszFilter.SetTerminalColumns(int32(width))
 		}
 	}()
+
+	return nil
 }
 
 func CloseTrzsz() {
-	signal.Stop(termch)
-	close(termch)
+	if termch == nil {
+		return
+	}
+
+	termchOnce.Do(func() {
+		signal.Stop(termch)
+		close(termch)
+	})
 }
 
-func OpenForwarding() {
-	for i, mode := range config.forWard {
-		if FoeWardMode(mode) != NOT {
-			conn := setForWardClient(FoeWardMode(mode), config.address[i])
-			outs = append(outs, conn)
-			go func() {
-				defer func(conn net.Conn) {
-					err := conn.Close()
-					if err != nil {
-						log.Fatal(err)
-					}
-				}(conn)
-				input(conn)
-			}()
-		}
-	}
-}
-
-func ErrorP(err error) {
-	if err != nil {
-		fmt.Fprint(os.Stderr, err)
-	}
-}
-func ErrorF(err error) {
-	if err != nil {
-		log.Fatal(err)
-	}
-}

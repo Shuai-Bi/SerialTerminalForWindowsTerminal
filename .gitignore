@@ -4,5 +4,6 @@ dist/
 /go.sum
 /view/*
 .claude/
-COM.exe
+*.exe
 coverage.out
+CLAUDE.md

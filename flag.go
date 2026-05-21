@@ -14,6 +14,8 @@ import (
 	"github.com/spf13/pflag"
 	"go.bug.st/serial"
 	"log"
+	"os"
+	"sort"
 	"strconv"
 	"strings"
 )
@@ -58,7 +60,9 @@ var (
 	address    = Flag{ptrVal{sl: &config.address}, "a", "address", Val{string: "127.0.0.1:12345"}, "转发服务地址(支持多次传入)"}
 	frameSize  = Flag{ptrVal{int: &config.frameSize}, "F", "Frame", Val{int: 16}, "帧大小"}
 	parityBit  = Flag{ptrVal{int: &config.parityBit}, "v", "verify", Val{int: 0}, "奇偶校验(0:无校验、1:奇校验、2:偶校验、3:1校验、4:0校验)"}
-	flags      = []Flag{portName, baudRate, dataBits, stopBits, outputCode, inputCode, endStr, forWard, address, frameSize, parityBit, logExt, timeExt}
+	guiMode    = Flag{ptrVal{bool: &config.enableGUI}, "g", "gui", Val{bool: false}, "启用TUI交互界面"}
+	hotkeyMod  = Flag{ptrVal{string: &config.hotkeyMod}, "k", "hotkey-mod", Val{string: "ctrl+alt"}, "本地快捷键修饰(ctrl+alt|ctrl+shift)"}
+	flags      = []Flag{portName, baudRate, dataBits, stopBits, outputCode, inputCode, endStr, forWard, address, frameSize, parityBit, logExt, timeExt, guiMode, hotkeyMod}
 )
 
 var (
@@ -79,18 +83,47 @@ const (
 	intVal
 	boolVal
 	extVal
+	sliceStrVal
+	sliceIntVal
 )
 
-func printUsage(ports []string) {
-	fmt.Printf("\n参数帮助:\n")
+func normalizeFlags() {
+	known := make(map[string]bool, len(flags))
 	for _, f := range flags {
+		known[f.lStr] = true
+	}
+	for i, arg := range os.Args[1:] {
+		if strings.HasPrefix(arg, "-") && !strings.HasPrefix(arg, "--") {
+			name := strings.TrimPrefix(arg, "-")
+			if known[name] {
+				os.Args[i+1] = "--" + name
+			}
+		}
+	}
+}
+
+func printUsage(ports []string) {
+	sorted := make([]Flag, len(flags))
+	copy(sorted, flags)
+	sort.Slice(sorted, func(i, j int) bool {
+		return sorted[i].lStr < sorted[j].lStr
+	})
+
+	fmt.Printf("\n参数帮助:\n")
+	fmt.Printf("  %-6s %-14s %-8s %-44s %s\n", "短参", "长参", "类型", "说明", "默认值")
+	fmt.Printf("  %-6s %-14s %-8s %-44s %s\n", "------", "------", "------", "------", "------")
+	for _, f := range sorted {
 		flagprint(f)
 	}
-	fmt.Printf("\n在线串口: %v\n", strings.Join(ports, ","))
+	fmt.Printf("\n在线串口: %v\n", strings.Join(ports, ", "))
 }
+
 func flagFindValue(v ptrVal) ValType {
 	if v.string != nil {
 		return stringVal
+	}
+	if v.sl != nil {
+		return sliceStrVal
 	}
 	if v.bool != nil {
 		return boolVal
@@ -98,23 +131,33 @@ func flagFindValue(v ptrVal) ValType {
 	if v.int != nil {
 		return intVal
 	}
+	if v.il != nil {
+		return sliceIntVal
+	}
 	if v.ext != nil {
 		return extVal
 	}
 	return notVal
 }
+
 func flagprint(f Flag) {
+	short := "-" + f.sStr
+	long := "--" + f.lStr
+	help := f.help
+
 	switch flagFindValue(f.v) {
 	case stringVal:
-		fmt.Printf("\t-%v -%v %T \n\t  %v\t默认值:%q\n", f.sStr, f.lStr, f.dv.string, f.help, f.dv.string)
+		fmt.Printf("  %-6s %-14s %-8s %-44s %q\n", short, long, "string", help, f.dv.string)
 	case intVal:
-		fmt.Printf("\t-%v -%v %T \n\t  %v\t默认值:%v\n", f.sStr, f.lStr, f.dv.int, f.help, f.dv.int)
+		fmt.Printf("  %-6s %-14s %-8s %-44s %v\n", short, long, "int", help, f.dv.int)
 	case boolVal:
-		fmt.Printf("\t-%v -%v %T \n\t  %v\t默认值:%v\n", f.sStr, f.lStr, f.dv.bool, f.help, f.dv.bool)
+		fmt.Printf("  %-6s %-14s %-8s %-44s %v\n", short, long, "bool", help, f.dv.bool)
 	case extVal:
-		fmt.Printf("\t-%v -%v %T \n\t  %v\t默认值:%v\n", f.sStr, f.lStr, f.dv.extdef, f.help, f.dv.extdef)
-	default:
-		panic("unhandled default case")
+		fmt.Printf("  %-6s %-14s %-8s %-44s %v\n", short, long, "string", help, f.dv.extdef)
+	case sliceStrVal:
+		fmt.Printf("  %-6s %-14s %-8s %-44s %q\n", short, long, "[]string", help, f.dv.string)
+	case sliceIntVal:
+		fmt.Printf("  %-6s %-14s %-8s %-44s %v\n", short, long, "[]int", help, f.dv.int)
 	}
 }
 func flagInit(f *Flag) {
@@ -144,6 +187,13 @@ func flagExt() {
 	}
 	if config.timesFmt != "" {
 		config.timesTamp = true
+	}
+	if config.hotkeyMod == "" {
+		config.hotkeyMod = "ctrl+alt"
+	}
+	config.hotkeyMod = strings.ToLower(strings.TrimSpace(config.hotkeyMod))
+	if config.hotkeyMod != "ctrl+alt" && config.hotkeyMod != "ctrl+shift" {
+		config.hotkeyMod = "ctrl+alt"
 	}
 }
 func getCliFlag() {

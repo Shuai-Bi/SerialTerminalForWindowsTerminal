@@ -2,9 +2,8 @@ package main
 
 import (
 	"fmt"
-	"log"
-	"net"
 	"os"
+	"strings"
 	"time"
 )
 
@@ -24,7 +23,10 @@ type Config struct {
 	timesTamp   bool
 	timesFmt    string
 	address     []string
+	enableGUI   bool
+	hotkeyMod   string
 }
+
 type FoeWardMode int
 
 const (
@@ -35,34 +37,48 @@ const (
 
 var config Config
 
-func setForWardClient(mode FoeWardMode, add string) (conn net.Conn) {
-	var err error
-	switch mode {
-	case NOT:
-
+func (m FoeWardMode) Network() string {
+	switch m {
 	case TCPC:
-		conn, err = net.Dial("tcp", add)
-		if err != nil {
-			log.Fatal(err)
-		}
+		return "tcp"
 	case UDPC:
-		conn, err = net.Dial("udp", add)
-		if err != nil {
-			log.Fatal(err)
-		}
+		return "udp"
 	default:
-		panic("未知模式设置")
+		return ""
 	}
-	return conn
 }
 
-func checkLogOpen() {
+func (m FoeWardMode) String() string {
+	switch m {
+	case TCPC:
+		return "tcp"
+	case UDPC:
+		return "udp"
+	default:
+		return "none"
+	}
+}
+
+func parseForwardMode(v string) (FoeWardMode, bool) {
+	switch strings.ToLower(strings.TrimSpace(v)) {
+	case "tcp", "tcp-c", "tcpc", "1":
+		return TCPC, true
+	case "udp", "udp-c", "udpc", "2":
+		return UDPC, true
+	default:
+		return NOT, false
+	}
+}
+
+func openLogFile() (*os.File, error) {
 	if config.enableLog {
 		path := fmt.Sprintf(config.logFilePath, config.portName, time.Now().Format("2006_01_02T150405"))
 		f, err := os.OpenFile(path, os.O_RDWR|os.O_APPEND|os.O_CREATE, 0666)
 		if err != nil {
-			log.Fatal(err)
+			return nil, err
 		}
-		outs = append(outs, f)
+		return f, nil
 	}
+
+	return nil, nil
 }

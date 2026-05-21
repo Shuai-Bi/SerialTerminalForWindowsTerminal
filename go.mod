@@ -1,4 +1,4 @@
-module COM
+module github.com/jixishi/SerialTerminalForWindowsTerminal
 
 go 1.22
 

@@ -4,6 +4,7 @@ package config
 import (
 	"fmt"
 	"os"
+	"strings"
 	"time"
 )
 
@@ -26,6 +27,15 @@ type Config struct {
 	Address     []string
 	EnableGUI   bool
 	HotkeyMod   string
+}
+
+// NormalizeHotkey validates and normalizes a hotkey modifier string.
+func NormalizeHotkey(mod string) string {
+	mod = strings.ToLower(strings.TrimSpace(mod))
+	if mod != "ctrl+alt" && mod != "ctrl+shift" {
+		mod = "ctrl+alt"
+	}
+	return mod
 }
 
 // OpenLogFile opens the configured log file for writing, or returns nil if logging is disabled.

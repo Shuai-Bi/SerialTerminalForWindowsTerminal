@@ -66,6 +66,7 @@ func Run() {
 	if cfg.EnableGUI {
 		model := tui.New(appInst)
 		p := tea.NewProgram(model, tea.WithAltScreen(), tea.WithoutSignalHandler())
+		enableVTInput(int(os.Stdin.Fd())) // Restore VT input for Ctrl+Alt+Key hotkeys
 		if _, err = p.Run(); err != nil {
 			fmt.Fprintf(os.Stderr, "tui failed: %v\n", err)
 			os.Exit(1)
@@ -336,13 +337,7 @@ func isExitHotkeySeq(seq []byte, cfg *config.Config) bool {
 	return false
 }
 
-func normalizeHotkey(mod string) string {
-	mod = strings.ToLower(strings.TrimSpace(mod))
-	if mod != "ctrl+alt" && mod != "ctrl+shift" {
-		mod = "ctrl+alt"
-	}
-	return mod
-}
+func normalizeHotkey(mod string) string { return config.NormalizeHotkey(mod) }
 
 func echoConsoleByte(out io.Writer, b byte)        { _, _ = out.Write([]byte{b}) }
 func echoConsoleNewline(out io.Writer)              { _, _ = io.WriteString(out, "\r\n") }

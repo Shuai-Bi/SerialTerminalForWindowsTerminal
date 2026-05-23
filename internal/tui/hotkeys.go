@@ -4,6 +4,7 @@ import (
 	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/jixishi/SerialTerminalForWindowsTerminal/internal/config"
 	"github.com/jixishi/SerialTerminalForWindowsTerminal/internal/event"
 )
 
@@ -55,13 +56,7 @@ func (m *Model) isLocalHotkey(key, action string) bool {
 	return hasCtrl && hasAlt
 }
 
-func normalizeHotkeyPrefix(mod string) string {
-	mod = strings.ToLower(strings.TrimSpace(mod))
-	if mod != "ctrl+alt" && mod != "ctrl+shift" {
-		mod = "ctrl+alt"
-	}
-	return mod
-}
+func normalizeHotkeyPrefix(mod string) string { return config.NormalizeHotkey(mod) }
 
 func hotkeyWith(mod, action string) string {
 	return normalizeHotkeyPrefix(mod) + "+" + action

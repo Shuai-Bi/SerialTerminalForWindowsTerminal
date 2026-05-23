@@ -405,21 +405,21 @@ func (m *Model) handleFormKey(msg tea.KeyMsg) (bool, tea.Cmd) {
 func (m *Model) renderForm() string {
 	lines := make([]boxLine, 0, len(m.formFields)+2)
 	for i, f := range m.formFields {
-		label := ""
-		if i < len(m.formLabels) {
-			label = m.formLabels[i]
-		}
 		prefix := "  "
 		if i == m.formFocus {
 			prefix = "▸ "
 		}
 		lines = append(lines, boxLine{
-			text:  prefix + label + "\n" + f.View(),
+			text:  prefix + f.View(),
 			style: modalBodyLineStyle(),
 		})
 	}
-	lines = append(lines, boxLine{text: "Tab switch | Enter submit | Esc cancel", style: modalFooterLineStyle()})
-	return renderBox(m.formTitle, lines, 40, m.availableModalWidth())
+	footer := "Tab cycles Type | Enter submit | Esc cancel"
+	if len(m.formFields) > 1 {
+		footer = "Tab/Shift+Tab switch | Enter submit | Esc cancel"
+	}
+	lines = append(lines, boxLine{text: footer, style: modalFooterLineStyle()})
+	return renderBox(m.formTitle, lines, 36, m.availableModalWidth())
 }
 
 func (m *Model) handlePromptKey(msg tea.KeyMsg) (bool, tea.Cmd) {

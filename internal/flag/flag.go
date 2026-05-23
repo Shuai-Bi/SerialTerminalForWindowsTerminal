@@ -101,7 +101,7 @@ func PrintUsage(ports []string) {
 		{"-k", "--hotkey-mod", "string", "hotkey modifier", "ctrl+alt"},
 		{"-f", "--forward", "[]int", "forward (0:none,1:TCP,2:UDP,3:TCP-S,4:UDP-S,5:COM)", "0"},
 		{"-a", "--address", "[]string", "forward address", "127.0.0.1:12345"},
-		{"-l", "--log", "string", "log path", "./%s-$s.txt"},
+		{"-l", "--log", "string", "log path (%s=port, then timestamp)", "./%s-%s.log"},
 		{"-t", "--time", "string", "timestamp format", "[06-01-02 15:04:05.000]"},
 	}
 	sort.Slice(flags, func(i, j int) bool { return flags[i].long < flags[j].long })
@@ -254,9 +254,9 @@ func GetCliFlag(cfg *config.Config) {
 		cfg.EnableLog = e
 		if e {
 			t, _ = inf.NewText(
-				text.WithPrompt("Path:"),
+				text.WithPrompt("Path(%s=port, then stamp):"),
 				text.WithPromptStyle(theme.DefaultTheme.PromptStyle),
-				text.WithDefaultValue("./%s-$s.txt"),
+				text.WithDefaultValue("./%s-%s.log"),
 			).Display()
 			cfg.LogFilePath = t
 		}

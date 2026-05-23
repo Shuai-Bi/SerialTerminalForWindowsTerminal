@@ -258,12 +258,13 @@ func (m *Model) View() string {
 	}
 	modifier := strings.ToUpper(normalizeHotkeyPrefix(m.App.Cfg().HotkeyMod))
 	hotkeys := "Hotkeys: Ctrl+C remote | " + modifier + "+C local | " + modifier + "+F forward | " + modifier + "+P plugins | " + modifier + "+M mode | F1 help"
-	hotkeys = lipgloss.NewStyle().Faint(true).Foreground(lipgloss.Color("245")).Render(hotkeys)
+	hotkeys = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("244")).Render(hotkeys)
 	status := m.statusLine
 	if status == "" {
 		status = "Ready"
 	}
-	status = lipgloss.NewStyle().Foreground(lipgloss.Color("250")).Faint(true).Render(status)
+	status = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("255")).Render(status)
+	suggest = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("39")).Render(suggest)
 	base := fmt.Sprintf("%s\n%s\n%s\n%s\n%s", m.viewport.View(), suggest, status, m.input.View(), hotkeys)
 	if !m.showModal {
 		return fillScreen(m.width, m.height, base)

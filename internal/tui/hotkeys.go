@@ -1,0 +1,181 @@
+package tui
+
+import (
+	"strconv"
+	"strings"
+
+	tea "github.com/charmbracelet/bubbletea"
+	"github.com/jixishi/SerialTerminalForWindowsTerminal/internal/config"
+	"github.com/jixishi/SerialTerminalForWindowsTerminal/internal/event"
+)
+
+func handleLocalHotkey(m *Model, key string) bool {
+	if m.isLocalHotkey(key, "h") {
+		modifier := strings.ToUpper(normalizeHotkeyPrefix(m.App.Cfg().HotkeyMod))
+		m.App.ShowModal("Shortcuts", modifier+"+C => local exit\nCtrl+C => remote interrupt\n"+modifier+"+F => forward panel\n"+modifier+"+P => plugin panel\n"+modifier+"+M => mode panel\nF1 => shortcut help")
+		return true
+	}
+	if m.isLocalHotkey(key, "f") {
+		m.App.OpenPanel(event.UIPanelForward)
+		return true
+	}
+	if m.isLocalHotkey(key, "p") {
+		m.App.OpenPanel(event.UIPanelPlugin)
+		return true
+	}
+	if m.isLocalHotkey(key, "m") {
+		m.App.OpenPanel(event.UIPanelMode)
+		return true
+	}
+	return false
+}
+
+func (m *Model) isLocalHotkey(key, action string) bool {
+	parts := strings.Split(strings.ToLower(key), "+")
+	if len(parts) < 2 || parts[len(parts)-1] != action {
+		return false
+	}
+
+	hasCtrl := false
+	hasAlt := false
+	hasShift := false
+	for _, p := range parts[:len(parts)-1] {
+		switch p {
+		case "ctrl":
+			hasCtrl = true
+		case "alt":
+			hasAlt = true
+		case "shift":
+			hasShift = true
+		}
+	}
+
+	mod := normalizeHotkeyPrefix(m.App.Cfg().HotkeyMod)
+	if mod == "ctrl+shift" {
+		return hasCtrl && hasShift
+	}
+	return hasCtrl && hasAlt
+}
+
+func normalizeHotkeyPrefix(mod string) string { return config.NormalizeHotkey(mod) }
+
+func hotkeyWith(mod, action string) string {
+	return normalizeHotkeyPrefix(mod) + "+" + action
+}
+
+func parseCtrlKey(key string) (byte, bool) {
+	if !strings.HasPrefix(key, "ctrl+") || strings.HasPrefix(key, "ctrl+shift+") {
+		return 0, false
+	}
+
+	parts := strings.Split(key, "+")
+	if len(parts) != 2 || len(parts[1]) != 1 {
+		return 0, false
+	}
+	ch := parts[1][0]
+	if ch < 'a' || ch > 'z' {
+		return 0, false
+	}
+	return ch, true
+}
+
+func (m *Model) handleViewportKey(msg tea.KeyMsg) bool {
+	if !m.ready || m.showModal {
+		return false
+	}
+
+	key := strings.ToLower(msg.String())
+	switch key {
+	case "pgup", "ctrl+u", "alt+up", "up":
+		var cmd tea.Cmd
+		m.viewport, cmd = m.viewport.Update(msg)
+		_ = cmd
+		m.followTail = false
+		return true
+	case "pgdown", "ctrl+d", "alt+down", "down":
+		var cmd tea.Cmd
+		m.viewport, cmd = m.viewport.Update(msg)
+		_ = cmd
+		return true
+	case "home":
+		m.viewport.GotoTop()
+		m.followTail = false
+		return true
+	case "end":
+		m.viewport.GotoBottom()
+		m.followTail = true
+		return true
+	default:
+		return false
+	}
+}
+
+func (m *Model) resetCompletion() {
+	m.completionActive = false
+	m.completionBase = ""
+	m.completionCandidates = nil
+	m.completionIndex = 0
+}
+
+func (m *Model) stepCompletion(direction int) {
+	if len(m.completionCandidates) == 0 {
+		m.resetCompletion()
+		return
+	}
+	if direction >= 0 {
+		m.completionIndex = (m.completionIndex + 1) % len(m.completionCandidates)
+	} else {
+		m.completionIndex = (m.completionIndex - 1 + len(m.completionCandidates)) % len(m.completionCandidates)
+	}
+	m.applyCompletion()
+}
+
+func (m *Model) applyCompletion() {
+	if len(m.completionCandidates) == 0 {
+		return
+	}
+	m.input.SetValue(m.completionBase + m.completionCandidates[m.completionIndex] + " ")
+}
+
+func completionBase(line string) string {
+	if strings.HasSuffix(line, " ") {
+		return line
+	}
+	i := strings.LastIndex(line, " ")
+	if i < 0 {
+		return ""
+	}
+	return line[:i+1]
+}
+
+func parseCSIuBytes(b []byte) (string, bool) {
+	s := string(b)
+	if !strings.HasPrefix(s, "\x1b[") || !strings.HasSuffix(s, "u") {
+		return "", false
+	}
+	inner := s[2 : len(s)-1]
+	parts := strings.SplitN(inner, ";", 2)
+	if len(parts) != 2 {
+		return "", false
+	}
+	cp, err := strconv.Atoi(parts[0])
+	if err != nil || cp < 'a' || cp > 'z' {
+		return "", false
+	}
+	mod, err := strconv.Atoi(parts[1])
+	if err != nil {
+		return "", false
+	}
+	var seq []string
+	if mod&4 != 0 {
+		seq = append(seq, "ctrl")
+	}
+	if mod&2 != 0 {
+		seq = append(seq, "alt")
+	}
+	if mod&1 != 0 {
+		seq = append(seq, "shift")
+	}
+	seq = append(seq, string(rune(cp)))
+	return strings.Join(seq, "+"), true
+}

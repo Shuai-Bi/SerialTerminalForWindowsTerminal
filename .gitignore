@@ -3,3 +3,7 @@
 dist/
 /go.sum
 /view/*
+.claude/
+*.exe
+coverage.out
+CLAUDE.md

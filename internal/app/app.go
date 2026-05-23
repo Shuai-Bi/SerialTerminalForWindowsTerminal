@@ -182,7 +182,9 @@ func (a *App) Close() {
 		close(a.done)
 		a.forward.Close()
 		a.plugins.Close()
-		a.sess.Close()
+		if a.sess != nil {
+			a.sess.Close()
+		}
 		if a.logFile != nil {
 			_ = a.logFile.Close()
 		}

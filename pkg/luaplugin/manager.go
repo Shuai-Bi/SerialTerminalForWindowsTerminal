@@ -57,6 +57,7 @@ func (m *Manager) Load(path string) (string, error) {
 	}
 
 	state := lua.NewState()
+	registerHelpers(state)
 	if err = state.DoFile(abs); err != nil {
 		state.Close()
 		return "", err
@@ -110,19 +111,20 @@ func (m *Manager) Disable(name string) error {
 	return nil
 }
 
-// Reload reloads a plugin's file.
+// Reload reloads a plugin's file atomically.
 func (m *Manager) Reload(name string) error {
 	m.mu.Lock()
 	p, ok := m.plugins[name]
-	m.mu.Unlock()
 	if !ok {
+		m.mu.Unlock()
 		return fmt.Errorf("plugin %s not found", name)
 	}
 
 	path := p.Path
-	if err := m.Unload(name); err != nil {
-		return err
-	}
+	p.L.Close()
+	delete(m.plugins, name)
+	m.mu.Unlock()
+
 	_, err := m.Load(path)
 	return err
 }

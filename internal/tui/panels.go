@@ -145,7 +145,7 @@ func (m *Model) handleForwardPanelKey(key string) bool {
 		m.startForwardForm("Update #"+fmt.Sprint(sel.ID), sel.Mode, sel.Address)
 		return true
 	default:
-		return true
+		return false
 	}
 }
 
@@ -270,7 +270,7 @@ func (m *Model) handlePluginPanelKey(key string) bool {
 		})
 		return true
 	default:
-		return true
+		return false
 	}
 }
 
@@ -321,7 +321,7 @@ func (m *Model) handleModePanelKey(key string) bool {
 		})
 		return true
 	default:
-		return true
+		return false
 	}
 }
 

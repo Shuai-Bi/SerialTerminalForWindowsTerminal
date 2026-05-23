@@ -61,6 +61,13 @@ type Model struct {
 	promptInput  textinput.Model
 	promptSubmit func(string)
 
+	formActive  bool
+	formTitle   string
+	formFields  []textinput.Model
+	formLabels  []string
+	formFocus   int
+	formSubmit  func([]string)
+
 	completionActive     bool
 	completionBase       string
 	completionCandidates []string
@@ -260,6 +267,10 @@ func (m *Model) View() string {
 	base := fmt.Sprintf("%s\n%s\n%s\n%s\n%s", m.viewport.View(), suggest, status, m.input.View(), hotkeys)
 	if !m.showModal {
 		return fillScreen(m.width, m.height, base)
+	}
+
+	if m.formActive {
+		return renderCenteredModalContent(m.width, m.height, m.renderForm())
 	}
 
 	if m.promptActive {

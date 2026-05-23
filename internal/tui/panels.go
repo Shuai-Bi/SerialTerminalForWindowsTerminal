@@ -14,6 +14,9 @@ import (
 func (m *Model) handleModalKey(msg tea.KeyMsg) (bool, tea.Cmd) {
 	keyStr := strings.ToLower(msg.String())
 
+	if m.formActive {
+		return m.handleFormKey(msg)
+	}
 	if m.promptActive {
 		return m.handlePromptKey(msg)
 	}
@@ -47,6 +50,8 @@ func (m *Model) closeModal() {
 	m.modalBody = ""
 	m.promptActive = false
 	m.promptSubmit = nil
+	m.formActive = false
+	m.formSubmit = nil
 	m.panelError = ""
 }
 
@@ -86,6 +91,9 @@ func (m *Model) buildModeItems() []modeItem {
 	}
 }
 
+// Forward modes for tab cycling
+var forwardModes = []string{"tcp", "udp", "tcp-s", "udp-s", "com"}
+
 func (m *Model) handleForwardPanelKey(key string) bool {
 	switch key {
 	case "up", "k":
@@ -103,24 +111,7 @@ func (m *Model) handleForwardPanelKey(key string) bool {
 		m.refreshPanel()
 		return true
 	case "a":
-		m.startPrompt("Add Forward", "tcp 127.0.0.1:12345 (tcp|udp|tcp-s|udp-s|com)", "", func(v string) {
-			parts := strings.Fields(v)
-			if len(parts) < 2 {
-				m.panelError = "usage: <tcp|udp|tcp-s|udp-s|com> <address>"
-				return
-			}
-			mode, ok := forward.ParseMode(parts[0])
-			if !ok {
-				m.panelError = "unknown mode: " + parts[0]
-				return
-			}
-			if _, err := m.App.Forward().Add(mode, parts[1]); err != nil {
-				m.panelError = err.Error()
-			} else {
-				m.panelError = ""
-				m.refreshPanel()
-			}
-		})
+		m.startForwardForm("Add Forward", "tcp", "", "")
 		return true
 	}
 	if len(m.forwardItems) == 0 {
@@ -131,13 +122,9 @@ func (m *Model) handleForwardPanelKey(key string) bool {
 	switch key {
 	case "enter":
 		if sel.Enabled {
-			if err := m.App.Forward().Disable(sel.ID); err != nil {
-				m.panelError = err.Error()
-			}
+			_ = m.App.Forward().Disable(sel.ID)
 		} else {
-			if err := m.App.Forward().Enable(sel.ID); err != nil {
-				m.panelError = err.Error()
-			}
+			_ = m.App.Forward().Enable(sel.ID)
 		}
 		m.panelError = ""
 		m.refreshPanel()
@@ -155,27 +142,76 @@ func (m *Model) handleForwardPanelKey(key string) bool {
 		})
 		return true
 	case "u":
-		m.startPrompt("Update Forward #"+fmt.Sprint(sel.ID), "tcp 127.0.0.1:12345", fmt.Sprintf("%s %s", sel.Mode, sel.Address), func(v string) {
-			parts := strings.Fields(v)
-			if len(parts) < 2 {
-				m.panelError = "usage: <tcp|udp|tcp-s|udp-s|com> <address>"
-				return
-			}
-			mode, ok := forward.ParseMode(parts[0])
-			if !ok {
-				m.panelError = "unknown mode: " + parts[0]
-				return
-			}
-			if err := m.App.Forward().Update(sel.ID, mode, parts[1]); err != nil {
-				m.panelError = err.Error()
-			} else {
-				m.panelError = ""
-				m.refreshPanel()
-			}
-		})
+		addr, port := splitAddr(sel.Address)
+		m.startForwardForm("Update Forward #"+fmt.Sprint(sel.ID), sel.Mode, addr, port)
 		return true
 	default:
 		return true
+	}
+}
+
+func (m *Model) startForwardForm(title, mode, addr, port string) {
+	// Mode input
+	modeIn := textinput.New()
+	modeIn.Prompt = "  Type: "
+	modeIn.Placeholder = "Tab to cycle"
+	modeIn.SetValue(mode)
+	modeIn.CharLimit = 20
+	modeIn.Width = 40
+
+	// Address input
+	addrIn := textinput.New()
+	addrIn.Prompt = "  Host: "
+	addrIn.Placeholder = "127.0.0.1 or COM2"
+	addrIn.SetValue(addr)
+	addrIn.CharLimit = 60
+	addrIn.Width = 40
+
+	// Port input
+	portIn := textinput.New()
+	portIn.Prompt = "  Port: "
+	portIn.Placeholder = "12345"
+	portIn.SetValue(port)
+	portIn.CharLimit = 10
+	portIn.Width = 40
+
+	m.formActive = true
+	m.formTitle = title
+	m.formLabels = []string{"Type", "Host", "Port"}
+	m.formFields = []textinput.Model{modeIn, addrIn, portIn}
+	m.formFocus = 0
+	m.formFields[0].Focus()
+
+	m.formSubmit = func(vals []string) {
+		modeStr := strings.TrimSpace(vals[0])
+		host := strings.TrimSpace(vals[1])
+		portStr := strings.TrimSpace(vals[2])
+
+		fm, ok := forward.ParseMode(modeStr)
+		if !ok {
+			m.panelError = "unknown mode: " + modeStr
+			return
+		}
+
+		address := host
+		if portStr != "" && fm != forward.COMPort {
+			address = host + ":" + portStr
+		}
+
+		if title == "Add Forward" {
+			if _, err := m.App.Forward().Add(fm, address); err != nil {
+				m.panelError = err.Error()
+				return
+			}
+		} else {
+			sel := m.forwardItems[m.panelIndex]
+			if err := m.App.Forward().Update(sel.ID, fm, address); err != nil {
+				m.panelError = err.Error()
+				return
+			}
+		}
+		m.panelError = ""
+		m.refreshPanel()
 	}
 }
 
@@ -318,6 +354,108 @@ func (m *Model) startPrompt(title, hint, initial string, submit func(string)) {
 	m.promptSubmit = submit
 }
 
+// --- Form methods (multi-field input) ---
+
+func (m *Model) handleFormKey(msg tea.KeyMsg) (bool, tea.Cmd) {
+	key := strings.ToLower(msg.String())
+	switch key {
+	case "esc":
+		m.formActive = false
+		m.formSubmit = nil
+		return true, nil
+	case "tab":
+		m.formFields[m.formFocus].Blur()
+		m.formFocus = (m.formFocus + 1) % len(m.formFields)
+
+		// Cycle forward mode on Tab when type field is focused
+		if m.formFocus == 0 {
+			cur := strings.TrimSpace(m.formFields[0].Value())
+			idx := -1
+			for i, m := range forwardModes {
+				if m == cur {
+					idx = i
+					break
+				}
+			}
+			idx = (idx + 1) % len(forwardModes)
+			m.formFields[0].SetValue(forwardModes[idx])
+		}
+		m.formFields[m.formFocus].Focus()
+		return true, nil
+	case "shift+tab":
+		m.formFields[m.formFocus].Blur()
+		m.formFocus = (m.formFocus - 1 + len(m.formFields)) % len(m.formFields)
+		if m.formFocus == 0 {
+			cur := strings.TrimSpace(m.formFields[0].Value())
+			idx := -1
+			for i, m := range forwardModes {
+				if m == cur { idx = i; break }
+			}
+			idx = (idx - 1 + len(forwardModes)) % len(forwardModes)
+			m.formFields[0].SetValue(forwardModes[idx])
+		}
+		m.formFields[m.formFocus].Focus()
+		return true, nil
+	case "enter":
+		vals := make([]string, len(m.formFields))
+		for i, f := range m.formFields {
+			vals[i] = f.Value()
+		}
+		submit := m.formSubmit
+		m.formActive = false
+		m.formSubmit = nil
+		if submit != nil {
+			submit(vals)
+		}
+		return true, nil
+	default:
+		var cmd tea.Cmd
+		m.formFields[m.formFocus], cmd = m.formFields[m.formFocus].Update(msg)
+		return true, cmd
+	}
+}
+
+func (m *Model) renderForm() string {
+	lines := make([]boxLine, 0, len(m.formFields)+2)
+	for i, f := range m.formFields {
+		label := ""
+		if i < len(m.formLabels) {
+			label = m.formLabels[i]
+		}
+		prefix := "  "
+		if i == m.formFocus {
+			prefix = "▸ "
+		}
+		lines = append(lines, boxLine{
+			text:  prefix + label + "\n" + f.View(),
+			style: modalBodyLineStyle(),
+		})
+	}
+	lines = append(lines, boxLine{text: "Tab switch | Enter submit | Esc cancel", style: modalFooterLineStyle()})
+	return renderBox(m.formTitle, lines, 40, m.availableModalWidth())
+}
+
+func splitAddr(address string) (host, port string) {
+	// For COM ports, port is empty
+	if strings.HasPrefix(strings.ToUpper(address), "COM") {
+		return address, ""
+	}
+	// Try host:port split
+	if h, p, err := netSplit(address); err == nil {
+		return h, p
+	}
+	return address, ""
+}
+
+func netSplit(addr string) (string, string, error) {
+	for i := len(addr) - 1; i >= 0; i-- {
+		if addr[i] == ':' {
+			return addr[:i], addr[i+1:], nil
+		}
+	}
+	return "", "", fmt.Errorf("no port")
+}
+
 func (m *Model) handlePromptKey(msg tea.KeyMsg) (bool, tea.Cmd) {
 	key := strings.ToLower(msg.String())
 	switch key {
@@ -367,7 +505,7 @@ func (m *Model) renderForwardPanel() string {
 	if m.panelError != "" {
 		lines = append(lines, panelLine{text: "ERROR: " + m.panelError})
 	}
-	return renderPanelModal("Forward Panel", lines, "Up/Down select | Enter toggle | a add | u update | d remove | r refresh | Esc close", m.availableModalWidth())
+	return renderPanelModal("Forward Panel", lines, "j/k select | Enter toggle | a add(form) | u update | d remove | r refresh | Esc close", m.availableModalWidth())
 }
 
 func (m *Model) renderPluginPanel() string {

@@ -111,7 +111,7 @@ func (m *Model) handleForwardPanelKey(key string) bool {
 		m.refreshPanel()
 		return true
 	case "a":
-		m.startForwardForm("Add Forward", "tcp", "", "")
+		m.startForwardForm("Add", "tcp", "")
 		return true
 	}
 	if len(m.forwardItems) == 0 {
@@ -142,70 +142,57 @@ func (m *Model) handleForwardPanelKey(key string) bool {
 		})
 		return true
 	case "u":
-		addr, port := splitAddr(sel.Address)
-		m.startForwardForm("Update Forward #"+fmt.Sprint(sel.ID), sel.Mode, addr, port)
+		m.startForwardForm("Update #"+fmt.Sprint(sel.ID), sel.Mode, sel.Address)
 		return true
 	default:
 		return true
 	}
 }
 
-func (m *Model) startForwardForm(title, mode, addr, port string) {
-	// Mode input
+func (m *Model) startForwardForm(title, mode, address string) {
 	modeIn := textinput.New()
 	modeIn.Prompt = "  Type: "
-	modeIn.Placeholder = "Tab to cycle"
+	modeIn.Placeholder = "Tab to cycle modes"
 	modeIn.SetValue(mode)
-	modeIn.CharLimit = 20
-	modeIn.Width = 40
+	modeIn.CharLimit = 10
+	modeIn.Width = 36
 
-	// Address input
 	addrIn := textinput.New()
-	addrIn.Prompt = "  Host: "
-	addrIn.Placeholder = "127.0.0.1 or COM2"
-	addrIn.SetValue(addr)
+	addrIn.Prompt = "  Addr: "
+	addrIn.Placeholder = "host:port or COM port"
+	addrIn.SetValue(address)
 	addrIn.CharLimit = 60
-	addrIn.Width = 40
-
-	// Port input
-	portIn := textinput.New()
-	portIn.Prompt = "  Port: "
-	portIn.Placeholder = "12345"
-	portIn.SetValue(port)
-	portIn.CharLimit = 10
-	portIn.Width = 40
+	addrIn.Width = 36
 
 	m.formActive = true
 	m.formTitle = title
-	m.formLabels = []string{"Type", "Host", "Port"}
-	m.formFields = []textinput.Model{modeIn, addrIn, portIn}
+	m.formLabels = []string{"Type (Tab cycle)", "Address"}
+	m.formFields = []textinput.Model{modeIn, addrIn}
 	m.formFocus = 0
 	m.formFields[0].Focus()
 
 	m.formSubmit = func(vals []string) {
 		modeStr := strings.TrimSpace(vals[0])
-		host := strings.TrimSpace(vals[1])
-		portStr := strings.TrimSpace(vals[2])
+		addrStr := strings.TrimSpace(vals[1])
 
 		fm, ok := forward.ParseMode(modeStr)
 		if !ok {
 			m.panelError = "unknown mode: " + modeStr
 			return
 		}
-
-		address := host
-		if portStr != "" && fm != forward.COMPort {
-			address = host + ":" + portStr
+		if addrStr == "" {
+			m.panelError = "address is required"
+			return
 		}
 
-		if title == "Add Forward" {
-			if _, err := m.App.Forward().Add(fm, address); err != nil {
+		if strings.HasPrefix(title, "Add") {
+			if _, err := m.App.Forward().Add(fm, addrStr); err != nil {
 				m.panelError = err.Error()
 				return
 			}
 		} else {
 			sel := m.forwardItems[m.panelIndex]
-			if err := m.App.Forward().Update(sel.ID, fm, address); err != nil {
+			if err := m.App.Forward().Update(sel.ID, fm, addrStr); err != nil {
 				m.panelError = err.Error()
 				return
 			}
@@ -433,27 +420,6 @@ func (m *Model) renderForm() string {
 	}
 	lines = append(lines, boxLine{text: "Tab switch | Enter submit | Esc cancel", style: modalFooterLineStyle()})
 	return renderBox(m.formTitle, lines, 40, m.availableModalWidth())
-}
-
-func splitAddr(address string) (host, port string) {
-	// For COM ports, port is empty
-	if strings.HasPrefix(strings.ToUpper(address), "COM") {
-		return address, ""
-	}
-	// Try host:port split
-	if h, p, err := netSplit(address); err == nil {
-		return h, p
-	}
-	return address, ""
-}
-
-func netSplit(addr string) (string, string, error) {
-	for i := len(addr) - 1; i >= 0; i-- {
-		if addr[i] == ':' {
-			return addr[:i], addr[i+1:], nil
-		}
-	}
-	return "", "", fmt.Errorf("no port")
 }
 
 func (m *Model) handlePromptKey(msg tea.KeyMsg) (bool, tea.Cmd) {

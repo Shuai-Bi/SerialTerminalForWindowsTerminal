@@ -62,7 +62,7 @@ func fillScreen(width, height int, content string) string {
 	if width <= 0 || height <= 0 {
 		return content
 	}
-	return lipgloss.Place(width, height, lipgloss.Center, lipgloss.Center, content,
+	return lipgloss.Place(width, height, lipgloss.Left, lipgloss.Top, content,
 		lipgloss.WithWhitespaceChars(" "),
 		lipgloss.WithWhitespaceForeground(lipgloss.Color("0")),
 	)

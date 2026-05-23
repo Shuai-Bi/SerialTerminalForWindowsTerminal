@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/jixishi/SerialTerminalForWindowsTerminal/internal/event"
+	"github.com/jixishi/SerialTerminalForWindowsTerminal/pkg/forward"
 )
 
 type CommandHandler func(args []string) error
@@ -297,7 +298,7 @@ func (d *CommandDispatcher) handleForwardCommand(args []string) error {
 		if len(args) < 4 {
 			return fmt.Errorf("usage: .forward add <tcp|udp> <address>")
 		}
-		mode, ok := parseForwardMode(args[2])
+		mode, ok := forward.ParseMode(args[2])
 		if !ok {
 			return fmt.Errorf("unknown forward mode: %s", args[2])
 		}
@@ -333,7 +334,7 @@ func (d *CommandDispatcher) handleForwardCommand(args []string) error {
 		if err != nil {
 			return err
 		}
-		mode, ok := parseForwardMode(args[3])
+		mode, ok := forward.ParseMode(args[3])
 		if !ok {
 			return fmt.Errorf("unknown forward mode: %s", args[3])
 		}

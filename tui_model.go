@@ -9,6 +9,8 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/jixishi/SerialTerminalForWindowsTerminal/internal/event"
+	"github.com/jixishi/SerialTerminalForWindowsTerminal/pkg/forward"
+	"github.com/jixishi/SerialTerminalForWindowsTerminal/pkg/luaplugin"
 )
 
 type doneMsg struct{}
@@ -45,8 +47,8 @@ type uiModel struct {
 	panelKind  event.UIPanelKind
 	panelIndex int
 
-	forwardItems []ForwardSnapshot
-	pluginItems  []PluginSnapshot
+	forwardItems []forward.Snapshot
+	pluginItems  []luaplugin.Snapshot
 	modeItems    []modeItem
 
 	promptActive bool

@@ -1,36 +1,84 @@
-package main
+// Package forward manages TCP/UDP forwarding targets for serial data.
+package forward
 
 import (
 	"fmt"
 	"net"
 	"sort"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
 )
 
-type ForwardStats struct {
+// Mode is the forwarding protocol mode.
+type Mode int
+
+const (
+	None Mode = iota
+	TCP
+	UDP
+)
+
+// ParseMode parses a mode string. Accepts "tcp"/"tcp-c"/"tcpc"/"1" → TCP, "udp"/"udp-c"/"udpc"/"2" → UDP.
+func ParseMode(v string) (Mode, bool) {
+	switch strings.ToLower(strings.TrimSpace(v)) {
+	case "tcp", "tcp-c", "tcpc", "1":
+		return TCP, true
+	case "udp", "udp-c", "udpc", "2":
+		return UDP, true
+	default:
+		return None, false
+	}
+}
+
+func (m Mode) Network() string {
+	switch m {
+	case TCP:
+		return "tcp"
+	case UDP:
+		return "udp"
+	default:
+		return ""
+	}
+}
+
+func (m Mode) String() string {
+	switch m {
+	case TCP:
+		return "tcp"
+	case UDP:
+		return "udp"
+	default:
+		return "none"
+	}
+}
+
+// Stats holds I/O statistics for a forward target.
+type Stats struct {
 	ReadBytes    uint64
 	WrittenBytes uint64
 	LastError    string
 }
 
-type ForwardTarget struct {
+// Target represents a single forwarding connection.
+type Target struct {
 	ID        int
-	Mode      FoeWardMode
+	Mode      Mode
 	Address   string
 	Enabled   bool
 	Connected bool
 	CreatedAt time.Time
 
 	conn    net.Conn
-	stats   ForwardStats
+	stats   Stats
 	mu      sync.Mutex
 	closeCh chan struct{}
 	closed  bool
 }
 
-type ForwardSnapshot struct {
+// Snapshot is a read-only view of a forward target for display.
+type Snapshot struct {
 	ID        int
 	Mode      string
 	Address   string
@@ -41,36 +89,40 @@ type ForwardSnapshot struct {
 	LastError string
 }
 
-type ForwardManager struct {
+// Manager coordinates forwarding targets.
+type Manager struct {
 	mu            sync.RWMutex
-	targets       map[int]*ForwardTarget
+	targets       map[int]*Target
 	nextID        int
 	writeToSerial func([]byte) error
 	notify        func(string, ...any)
 	onInbound     func(int, []byte)
 }
 
-func NewForwardManager(writeToSerial func([]byte) error, notify func(string, ...any)) *ForwardManager {
-	return &ForwardManager{
-		targets:       make(map[int]*ForwardTarget),
+// NewManager creates a forwarding manager.
+func NewManager(writeToSerial func([]byte) error, notify func(string, ...any)) *Manager {
+	return &Manager{
+		targets:       make(map[int]*Target),
 		nextID:        1,
 		writeToSerial: writeToSerial,
 		notify:        notify,
 	}
 }
 
-func (m *ForwardManager) SetInboundReporter(fn func(int, []byte)) {
+// SetInboundReporter sets a callback invoked when inbound data arrives from a target.
+func (m *Manager) SetInboundReporter(fn func(int, []byte)) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	m.onInbound = fn
 }
 
-func (m *ForwardManager) Add(mode FoeWardMode, address string) (int, error) {
-	if mode == NOT {
+// Add creates and connects a new forward target.
+func (m *Manager) Add(mode Mode, address string) (int, error) {
+	if mode == None {
 		return 0, fmt.Errorf("forward mode cannot be none")
 	}
 
-	t := &ForwardTarget{
+	t := &Target{
 		Mode:      mode,
 		Address:   address,
 		Enabled:   true,
@@ -98,7 +150,7 @@ func (m *ForwardManager) Add(mode FoeWardMode, address string) (int, error) {
 	return t.ID, nil
 }
 
-func (m *ForwardManager) readLoop(t *ForwardTarget, conn net.Conn, stop <-chan struct{}) {
+func (m *Manager) readLoop(t *Target, conn net.Conn, stop <-chan struct{}) {
 	buf := make([]byte, 4096)
 	for {
 		n, err := conn.Read(buf)
@@ -133,7 +185,8 @@ func (m *ForwardManager) readLoop(t *ForwardTarget, conn net.Conn, stop <-chan s
 	}
 }
 
-func (m *ForwardManager) Remove(id int) error {
+// Remove disconnects and removes a target.
+func (m *Manager) Remove(id int) error {
 	m.mu.Lock()
 	t, ok := m.targets[id]
 	if !ok {
@@ -148,7 +201,8 @@ func (m *ForwardManager) Remove(id int) error {
 	return nil
 }
 
-func (m *ForwardManager) Enable(id int) error {
+// Enable (re)connects a target.
+func (m *Manager) Enable(id int) error {
 	m.mu.RLock()
 	t, ok := m.targets[id]
 	m.mu.RUnlock()
@@ -178,8 +232,9 @@ func (m *ForwardManager) Enable(id int) error {
 	return nil
 }
 
-func (m *ForwardManager) Update(id int, mode FoeWardMode, address string) error {
-	if mode == NOT {
+// Update changes a target's mode and address, reconnecting if enabled.
+func (m *Manager) Update(id int, mode Mode, address string) error {
+	if mode == None {
 		return fmt.Errorf("forward mode cannot be none")
 	}
 
@@ -196,7 +251,6 @@ func (m *ForwardManager) Update(id int, mode FoeWardMode, address string) error 
 	t.Address = address
 	t.mu.Unlock()
 
-	// Restart the target to apply new mode/address when enabled.
 	t.close()
 
 	if !wasEnabled {
@@ -207,7 +261,8 @@ func (m *ForwardManager) Update(id int, mode FoeWardMode, address string) error 
 	return m.Enable(id)
 }
 
-func (m *ForwardManager) Disable(id int) error {
+// Disable disconnects a target without removing it.
+func (m *Manager) Disable(id int) error {
 	m.mu.RLock()
 	t, ok := m.targets[id]
 	m.mu.RUnlock()
@@ -223,13 +278,14 @@ func (m *ForwardManager) Disable(id int) error {
 	return nil
 }
 
-func (m *ForwardManager) Broadcast(data []byte) {
+// Broadcast sends data to all enabled, connected targets.
+func (m *Manager) Broadcast(data []byte) {
 	if len(data) == 0 {
 		return
 	}
 
 	m.mu.RLock()
-	items := make([]*ForwardTarget, 0, len(m.targets))
+	items := make([]*Target, 0, len(m.targets))
 	for _, t := range m.targets {
 		items = append(items, t)
 	}
@@ -251,11 +307,12 @@ func (m *ForwardManager) Broadcast(data []byte) {
 	}
 }
 
-func (m *ForwardManager) List() []ForwardSnapshot {
+// List returns a snapshot of all targets.
+func (m *Manager) List() []Snapshot {
 	m.mu.RLock()
-	items := make([]ForwardSnapshot, 0, len(m.targets))
+	items := make([]Snapshot, 0, len(m.targets))
 	for _, t := range m.targets {
-		items = append(items, ForwardSnapshot{
+		items = append(items, Snapshot{
 			ID:        t.ID,
 			Mode:      t.Mode.String(),
 			Address:   t.Address,
@@ -275,13 +332,14 @@ func (m *ForwardManager) List() []ForwardSnapshot {
 	return items
 }
 
-func (m *ForwardManager) Close() {
+// Close disconnects and removes all targets.
+func (m *Manager) Close() {
 	m.mu.Lock()
-	items := make([]*ForwardTarget, 0, len(m.targets))
+	items := make([]*Target, 0, len(m.targets))
 	for _, t := range m.targets {
 		items = append(items, t)
 	}
-	m.targets = map[int]*ForwardTarget{}
+	m.targets = map[int]*Target{}
 	m.mu.Unlock()
 
 	for _, t := range items {
@@ -289,7 +347,7 @@ func (m *ForwardManager) Close() {
 	}
 }
 
-func (t *ForwardTarget) close() {
+func (t *Target) close() {
 	t.mu.Lock()
 	if t.closed {
 		t.mu.Unlock()

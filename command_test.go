@@ -6,6 +6,8 @@ import (
 	"testing"
 
 	"github.com/jixishi/SerialTerminalForWindowsTerminal/internal/event"
+	"github.com/jixishi/SerialTerminalForWindowsTerminal/pkg/forward"
+	"github.com/jixishi/SerialTerminalForWindowsTerminal/pkg/luaplugin"
 )
 
 func setupTestPipes() {
@@ -25,12 +27,12 @@ func setupTestPipes() {
 func newTestAppForCommand() *App {
 	a := &App{
 		cfg:      &Config{inputCode: "UTF-8", outputCode: "UTF-8", endStr: "\n"},
-		plugins:  NewPluginManager(),
+		plugins:  luaplugin.NewManager(),
 		uiEvents: make(chan event.UIEvent, 32),
 		done:     make(chan struct{}),
 	}
 	a.SetUIEnabled(true)
-	a.forward = NewForwardManager(func([]byte) error { return nil }, func(string, ...any) {})
+	a.forward = forward.NewManager(func([]byte) error { return nil }, func(string, ...any) {})
 	a.dispatcher = NewCommandDispatcher(a)
 	return a
 }

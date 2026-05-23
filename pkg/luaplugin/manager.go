@@ -1,4 +1,5 @@
-package main
+// Package luaplugin provides a Lua plugin system for processing serial data streams.
+package luaplugin
 
 import (
 	"fmt"
@@ -10,7 +11,8 @@ import (
 	lua "github.com/yuin/gopher-lua"
 )
 
-type LuaPlugin struct {
+// Plugin represents a loaded Lua plugin.
+type Plugin struct {
 	Name    string
 	Path    string
 	Enabled bool
@@ -18,22 +20,26 @@ type LuaPlugin struct {
 	callMu  sync.Mutex
 }
 
-type PluginSnapshot struct {
+// Snapshot is a read-only view of a plugin for display.
+type Snapshot struct {
 	Name    string
 	Path    string
 	Enabled bool
 }
 
-type PluginManager struct {
+// Manager coordinates plugin lifecycle and hook execution.
+type Manager struct {
 	mu      sync.RWMutex
-	plugins map[string]*LuaPlugin
+	plugins map[string]*Plugin
 }
 
-func NewPluginManager() *PluginManager {
-	return &PluginManager{plugins: make(map[string]*LuaPlugin)}
+// NewManager creates a plugin manager.
+func NewManager() *Manager {
+	return &Manager{plugins: make(map[string]*Plugin)}
 }
 
-func (m *PluginManager) Load(path string) (string, error) {
+// Load loads a Lua plugin from the given path.
+func (m *Manager) Load(path string) (string, error) {
 	abs, err := filepath.Abs(path)
 	if err != nil {
 		return "", err
@@ -56,7 +62,7 @@ func (m *PluginManager) Load(path string) (string, error) {
 		return "", err
 	}
 
-	m.plugins[name] = &LuaPlugin{
+	m.plugins[name] = &Plugin{
 		Name:    name,
 		Path:    abs,
 		Enabled: true,
@@ -66,7 +72,8 @@ func (m *PluginManager) Load(path string) (string, error) {
 	return name, nil
 }
 
-func (m *PluginManager) Unload(name string) error {
+// Unload unloads a plugin and closes its Lua state.
+func (m *Manager) Unload(name string) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	p, ok := m.plugins[name]
@@ -79,7 +86,8 @@ func (m *PluginManager) Unload(name string) error {
 	return nil
 }
 
-func (m *PluginManager) Enable(name string) error {
+// Enable enables a previously loaded plugin.
+func (m *Manager) Enable(name string) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	p, ok := m.plugins[name]
@@ -90,7 +98,8 @@ func (m *PluginManager) Enable(name string) error {
 	return nil
 }
 
-func (m *PluginManager) Disable(name string) error {
+// Disable disables a plugin without unloading it.
+func (m *Manager) Disable(name string) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	p, ok := m.plugins[name]
@@ -101,7 +110,8 @@ func (m *PluginManager) Disable(name string) error {
 	return nil
 }
 
-func (m *PluginManager) Reload(name string) error {
+// Reload reloads a plugin's file.
+func (m *Manager) Reload(name string) error {
 	m.mu.Lock()
 	p, ok := m.plugins[name]
 	m.mu.Unlock()
@@ -117,11 +127,12 @@ func (m *PluginManager) Reload(name string) error {
 	return err
 }
 
-func (m *PluginManager) List() []PluginSnapshot {
+// List returns a snapshot of all plugins.
+func (m *Manager) List() []Snapshot {
 	m.mu.RLock()
-	res := make([]PluginSnapshot, 0, len(m.plugins))
+	res := make([]Snapshot, 0, len(m.plugins))
 	for _, p := range m.plugins {
-		res = append(res, PluginSnapshot{Name: p.Name, Path: p.Path, Enabled: p.Enabled})
+		res = append(res, Snapshot{Name: p.Name, Path: p.Path, Enabled: p.Enabled})
 	}
 	m.mu.RUnlock()
 
@@ -131,17 +142,19 @@ func (m *PluginManager) List() []PluginSnapshot {
 	return res
 }
 
-func (m *PluginManager) ProcessInput(data []byte) ([]byte, error) {
+// ProcessInput runs the OnInput hook chain across all enabled plugins.
+func (m *Manager) ProcessInput(data []byte) ([]byte, error) {
 	return m.processDataHook("OnInput", data)
 }
 
-func (m *PluginManager) ProcessOutput(data []byte) ([]byte, error) {
+// ProcessOutput runs the OnOutput hook chain across all enabled plugins.
+func (m *Manager) ProcessOutput(data []byte) ([]byte, error) {
 	return m.processDataHook("OnOutput", data)
 }
 
-func (m *PluginManager) processDataHook(name string, data []byte) ([]byte, error) {
+func (m *Manager) processDataHook(name string, data []byte) ([]byte, error) {
 	m.mu.RLock()
-	plugins := make([]*LuaPlugin, 0, len(m.plugins))
+	plugins := make([]*Plugin, 0, len(m.plugins))
 	for _, p := range m.plugins {
 		plugins = append(plugins, p)
 	}
@@ -170,9 +183,10 @@ func (m *PluginManager) processDataHook(name string, data []byte) ([]byte, error
 	return current, nil
 }
 
-func (m *PluginManager) ProcessCommand(line string) (string, bool, error) {
+// ProcessCommand runs the OnCommand hook chain across all enabled plugins.
+func (m *Manager) ProcessCommand(line string) (string, bool, error) {
 	m.mu.RLock()
-	plugins := make([]*LuaPlugin, 0, len(m.plugins))
+	plugins := make([]*Plugin, 0, len(m.plugins))
 	for _, p := range m.plugins {
 		plugins = append(plugins, p)
 	}
@@ -205,58 +219,12 @@ func (m *PluginManager) ProcessCommand(line string) (string, bool, error) {
 	return current, true, nil
 }
 
-func (m *PluginManager) Close() {
+// Close closes all plugin Lua states.
+func (m *Manager) Close() {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	for _, p := range m.plugins {
 		p.L.Close()
 	}
-	m.plugins = map[string]*LuaPlugin{}
-}
-
-func callStringHook(L *lua.LState, name string, payload string) (*string, bool, error) {
-	fn := L.GetGlobal(name)
-	if fn.Type() == lua.LTNil {
-		return nil, false, nil
-	}
-
-	if err := L.CallByParam(lua.P{Fn: fn, NRet: 1, Protect: true}, lua.LString(payload)); err != nil {
-		return nil, true, err
-	}
-
-	ret := L.Get(-1)
-	L.Pop(1)
-	if ret.Type() == lua.LTNil {
-		return nil, true, nil
-	}
-
-	s := ret.String()
-	return &s, true, nil
-}
-
-func callCommandHook(L *lua.LState, name, line string) (string, bool, bool, error) {
-	fn := L.GetGlobal(name)
-	if fn.Type() == lua.LTNil {
-		return "", true, false, nil
-	}
-
-	if err := L.CallByParam(lua.P{Fn: fn, NRet: 2, Protect: true}, lua.LString(line)); err != nil {
-		return "", true, true, err
-	}
-
-	allowVal := L.Get(-1)
-	lineVal := L.Get(-2)
-	L.Pop(2)
-
-	allow := true
-	if allowVal.Type() == lua.LTBool {
-		allow = lua.LVAsBool(allowVal)
-	}
-
-	next := ""
-	if lineVal.Type() != lua.LTNil {
-		next = lineVal.String()
-	}
-
-	return next, allow, true, nil
+	m.plugins = map[string]*Plugin{}
 }

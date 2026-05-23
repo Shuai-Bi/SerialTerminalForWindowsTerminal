@@ -9,6 +9,8 @@ import (
 	"go.bug.st/serial"
 
 	"github.com/jixishi/SerialTerminalForWindowsTerminal/internal/event"
+	"github.com/jixishi/SerialTerminalForWindowsTerminal/pkg/forward"
+	"github.com/jixishi/SerialTerminalForWindowsTerminal/pkg/luaplugin"
 )
 
 func TestPrefixLines(t *testing.T) {
@@ -60,7 +62,7 @@ func TestSendLine(t *testing.T) {
 	setupTestPipes()
 	a := &App{
 		cfg:      &Config{endStr: "\r\n"},
-		plugins:  NewPluginManager(),
+		plugins:  luaplugin.NewManager(),
 		uiEvents: make(chan event.UIEvent, 8),
 		done:     make(chan struct{}),
 	}
@@ -82,12 +84,12 @@ func TestHandleLine(t *testing.T) {
 	setupTestPipes()
 	a := &App{
 		cfg:      &Config{endStr: "\n", inputCode: "UTF-8", outputCode: "UTF-8"},
-		plugins:  NewPluginManager(),
+		plugins:  luaplugin.NewManager(),
 		uiEvents: make(chan event.UIEvent, 8),
 		done:     make(chan struct{}),
 	}
 	a.SetUIEnabled(true)
-	a.forward = NewForwardManager(func([]byte) error { return nil }, func(string, ...any) {})
+	a.forward = forward.NewManager(func([]byte) error { return nil }, func(string, ...any) {})
 	a.dispatcher = NewCommandDispatcher(a)
 
 	a.handleLine("hello")
@@ -142,8 +144,8 @@ func TestEmitUISaturation(t *testing.T) {
 func TestAppClose(t *testing.T) {
 	a := &App{
 		done:     make(chan struct{}),
-		plugins:  NewPluginManager(),
-		forward:  NewForwardManager(func([]byte) error { return nil }, func(string, ...any) {}),
+		plugins:  luaplugin.NewManager(),
+		forward:  forward.NewManager(func([]byte) error { return nil }, func(string, ...any) {}),
 		uiEvents: make(chan event.UIEvent, 4),
 	}
 	a.SetUIEnabled(true)
@@ -167,20 +169,20 @@ func TestLoadConfiguredForwards(t *testing.T) {
 	defer listener.Close()
 
 	config = Config{
-		forWard: []int{int(TCPC), int(NOT), int(UDPC)},
+		forWard: []int{int(forward.TCP), int(forward.None), int(forward.UDP)},
 		address: []string{listener.Addr().String(), "", ""},
 	}
 
 	a := &App{
 		cfg:      &config,
-		forward:  NewForwardManager(func([]byte) error { return nil }, func(string, ...any) {}),
+		forward:  forward.NewManager(func([]byte) error { return nil }, func(string, ...any) {}),
 		uiEvents: make(chan event.UIEvent, 8),
 		done:     make(chan struct{}),
 	}
 	a.SetUIEnabled(true)
 
 	a.loadConfiguredForwards()
-	// TCPC should be added, NOT skipped, UDPC skipped (empty address)
+	// forward.TCP should be added, forward.None skipped, forward.UDP skipped (empty address)
 	items := a.forward.List()
 	if len(items) != 1 || items[0].Mode != "tcp" {
 		t.Fatalf("expected 1 TCP forward, got %+v", items)

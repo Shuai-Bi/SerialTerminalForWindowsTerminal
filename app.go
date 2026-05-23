@@ -13,12 +13,14 @@ import (
 
 	"github.com/jixishi/SerialTerminalForWindowsTerminal/internal/event"
 	"github.com/jixishi/SerialTerminalForWindowsTerminal/pkg/charset"
+	"github.com/jixishi/SerialTerminalForWindowsTerminal/pkg/forward"
+	"github.com/jixishi/SerialTerminalForWindowsTerminal/pkg/luaplugin"
 )
 
 type App struct {
 	cfg        *Config
-	forward    *ForwardManager
-	plugins    *PluginManager
+	forward    *forward.Manager
+	plugins    *luaplugin.Manager
 	dispatcher *CommandDispatcher
 
 	uiEvents chan event.UIEvent
@@ -40,14 +42,14 @@ func NewApp(cfg *Config) (*App, error) {
 
 	a := &App{
 		cfg:      cfg,
-		plugins:  NewPluginManager(),
+		plugins:  luaplugin.NewManager(),
 		uiEvents: make(chan event.UIEvent, 512),
 		done:     make(chan struct{}),
 		logFile:  f,
 	}
 	a.uiEnabled.Store(true)
 
-	a.forward = NewForwardManager(a.writeRawToSession, a.Notifyf)
+	a.forward = forward.NewManager(a.writeRawToSession, a.Notifyf)
 	a.forward.SetInboundReporter(a.reportForwardIngress)
 	a.dispatcher = NewCommandDispatcher(a)
 	if err = a.loadDefaultDemoPlugin(); err != nil {
@@ -167,8 +169,8 @@ func (a *App) waitDone() <-chan struct{} {
 
 func (a *App) loadConfiguredForwards() {
 	for i, mode := range config.forWard {
-		m := FoeWardMode(mode)
-		if m == NOT {
+		m := forward.Mode(mode)
+		if m == forward.None {
 			continue
 		}
 		if i >= len(config.address) {

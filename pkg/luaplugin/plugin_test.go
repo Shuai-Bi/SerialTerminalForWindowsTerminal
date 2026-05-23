@@ -1,4 +1,4 @@
-package main
+package luaplugin
 
 import (
 	"os"
@@ -15,8 +15,8 @@ func writeLuaScript(t *testing.T, name, content string) string {
 	return path
 }
 
-func TestPluginManagerLoadAndHooks(t *testing.T) {
-	m := NewPluginManager()
+func TestManagerLoadAndHooks(t *testing.T) {
+	m := NewManager()
 	t.Cleanup(m.Close)
 
 	path := writeLuaScript(t, "rewrite.lua", `
@@ -66,8 +66,8 @@ end
 	}
 }
 
-func TestPluginManagerDisableAndUnload(t *testing.T) {
-	m := NewPluginManager()
+func TestManagerDisableAndUnload(t *testing.T) {
+	m := NewManager()
 	t.Cleanup(m.Close)
 
 	path := writeLuaScript(t, "simple.lua", `
@@ -111,8 +111,8 @@ end
 	}
 }
 
-func TestPluginManagerOutputDrop(t *testing.T) {
-	m := NewPluginManager()
+func TestManagerOutputDrop(t *testing.T) {
+	m := NewManager()
 	t.Cleanup(m.Close)
 
 	path := writeLuaScript(t, "drop.lua", `
@@ -134,8 +134,8 @@ end
 	}
 }
 
-func TestPluginManagerReload(t *testing.T) {
-	m := NewPluginManager()
+func TestManagerReload(t *testing.T) {
+	m := NewManager()
 	t.Cleanup(m.Close)
 
 	path := writeLuaScript(t, "reloadable.lua", `
@@ -165,8 +165,8 @@ end
 	}
 }
 
-func TestPluginManagerCommandBlock(t *testing.T) {
-	m := NewPluginManager()
+func TestManagerCommandBlock(t *testing.T) {
+	m := NewManager()
 	t.Cleanup(m.Close)
 
 	path := writeLuaScript(t, "blocker.lua", `
@@ -188,8 +188,8 @@ end
 	}
 }
 
-func TestPluginManagerLoadErrors(t *testing.T) {
-	m := NewPluginManager()
+func TestManagerLoadErrors(t *testing.T) {
+	m := NewManager()
 	t.Cleanup(m.Close)
 
 	_, err := m.Load("nonexistent_file.lua")
@@ -204,8 +204,8 @@ func TestPluginManagerLoadErrors(t *testing.T) {
 	}
 }
 
-func TestPluginManagerDuplicateLoad(t *testing.T) {
-	m := NewPluginManager()
+func TestManagerDuplicateLoad(t *testing.T) {
+	m := NewManager()
 	t.Cleanup(m.Close)
 
 	path := writeLuaScript(t, "once.lua", "function OnInput(s) return s end")
@@ -220,8 +220,8 @@ func TestPluginManagerDuplicateLoad(t *testing.T) {
 	}
 }
 
-func TestPluginManagerListWithDisabled(t *testing.T) {
-	m := NewPluginManager()
+func TestManagerListWithDisabled(t *testing.T) {
+	m := NewManager()
 	t.Cleanup(m.Close)
 
 	path := writeLuaScript(t, "mylist.lua", "function OnInput(s) return s end")

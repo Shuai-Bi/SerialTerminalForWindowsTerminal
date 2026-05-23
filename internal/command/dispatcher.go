@@ -99,8 +99,8 @@ func (d *Dispatcher) registerAll() {
 
 	d.register(RuntimeCommand{
 		Name:        ".forward",
-		Usage:       ".forward <list|add|remove|enable|disable|update|stats>",
-		Description: "manage forwarding at runtime",
+		Usage:       ".forward <list|add|remove|enable|disable|update>",
+		Description: "manage forwarding (tcp/udp/tcp-s/udp-s/com)",
 		Handler:     d.handleForwardCommand,
 		Completer:   completeForward,
 	})

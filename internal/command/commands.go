@@ -39,7 +39,7 @@ func (d *Dispatcher) handleForwardCommand(args []string) error {
 
 	case "add":
 		if len(args) < 4 {
-			return fmt.Errorf("usage: .forward add <tcp|udp> <address>")
+			return fmt.Errorf("usage: .forward add <tcp|udp|tcp-s|udp-s|com> <address>")
 		}
 		mode, ok := forward.ParseMode(args[2])
 		if !ok {
@@ -71,7 +71,7 @@ func (d *Dispatcher) handleForwardCommand(args []string) error {
 
 	case "update":
 		if len(args) < 5 {
-			return fmt.Errorf("usage: .forward update <id> <tcp|udp> <address>")
+			return fmt.Errorf("usage: .forward update <id> <tcp|udp|tcp-s|udp-s|com> <address>")
 		}
 		id, err := strconv.Atoi(args[2])
 		if err != nil {

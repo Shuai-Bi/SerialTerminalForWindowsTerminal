@@ -103,10 +103,10 @@ func (m *Model) handleForwardPanelKey(key string) bool {
 		m.refreshPanel()
 		return true
 	case "a":
-		m.startPrompt("Add Forward", "tcp 127.0.0.1:12345", "", func(v string) {
+		m.startPrompt("Add Forward", "tcp 127.0.0.1:12345 (tcp|udp|tcp-s|udp-s|com)", "", func(v string) {
 			parts := strings.Fields(v)
 			if len(parts) < 2 {
-				m.panelError = "usage: <tcp|udp> <address>"
+				m.panelError = "usage: <tcp|udp|tcp-s|udp-s|com> <address>"
 				return
 			}
 			mode, ok := forward.ParseMode(parts[0])
@@ -158,7 +158,7 @@ func (m *Model) handleForwardPanelKey(key string) bool {
 		m.startPrompt("Update Forward #"+fmt.Sprint(sel.ID), "tcp 127.0.0.1:12345", fmt.Sprintf("%s %s", sel.Mode, sel.Address), func(v string) {
 			parts := strings.Fields(v)
 			if len(parts) < 2 {
-				m.panelError = "usage: <tcp|udp> <address>"
+				m.panelError = "usage: <tcp|udp|tcp-s|udp-s|com> <address>"
 				return
 			}
 			mode, ok := forward.ParseMode(parts[0])

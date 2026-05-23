@@ -29,15 +29,15 @@ func filterPrefix(cands []string, cur string) []string {
 
 func completeForward(args []string) []string {
 	if len(args) <= 2 {
-		return []string{"list", "add", "remove", "enable", "disable", "update", "stats"}
+		return []string{"list", "add", "remove", "enable", "disable", "update"}
 	}
 
 	if len(args) == 3 && args[1] == "add" {
-		return []string{"tcp", "udp"}
+		return []string{"tcp", "udp", "tcp-s", "udp-s", "com"}
 	}
 
 	if len(args) == 4 && args[1] == "update" {
-		return []string{"tcp", "udp"}
+		return []string{"tcp", "udp", "tcp-s", "udp-s", "com"}
 	}
 
 	return nil

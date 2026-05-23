@@ -37,7 +37,7 @@ func Init(cfg *config.Config) {
 	pflag.IntVarP(&cfg.ParityBit, "verify", "v", 0, "parity (0:none,1:odd,2:even,3:mark,4:space)")
 	pflag.BoolVarP(&cfg.EnableGUI, "gui", "g", false, "enable TUI mode")
 	pflag.StringVarP(&cfg.HotkeyMod, "hotkey-mod", "k", "ctrl+alt", "hotkey modifier (ctrl+alt|ctrl+shift)")
-	pflag.IntSliceVarP(&cfg.ForWard, "forward", "f", nil, "forward mode (0:none,1:TCP,2:UDP)")
+	pflag.IntSliceVarP(&cfg.ForWard, "forward", "f", nil, "forward mode (0:none,1:TCP,2:UDP,3:TCP-S,4:UDP-S,5:COM)")
 	pflag.StringArrayVarP(&cfg.Address, "address", "a", nil, "forward address")
 	pflag.StringVarP(&cfg.LogFilePath, "log", "l", "", "log file path")
 	_ = pflag.Lookup("log") // mark for NoOptDefVal
@@ -99,7 +99,7 @@ func PrintUsage(ports []string) {
 		{"-v", "--verify", "int", "parity", "0"},
 		{"-g", "--gui", "bool", "enable TUI", "false"},
 		{"-k", "--hotkey-mod", "string", "hotkey modifier", "ctrl+alt"},
-		{"-f", "--forward", "[]int", "forward mode", "0"},
+		{"-f", "--forward", "[]int", "forward (0:none,1:TCP,2:UDP,3:TCP-S,4:UDP-S,5:COM)", "0"},
 		{"-a", "--address", "[]string", "forward address", "127.0.0.1:12345"},
 		{"-l", "--log", "string", "log path", "./%s-$s.txt"},
 		{"-t", "--time", "string", "timestamp format", "[06-01-02 15:04:05.000]"},
@@ -122,7 +122,7 @@ var (
 	datas    = []string{"5", "6", "7", "8"}
 	stops    = []string{"1", "1.5", "2"}
 	paritys  = []string{"None", "Odd", "Even", "Mark", "Space"}
-	forwards = []string{"No", "TCP-C", "UDP-C"}
+	forwards = []string{"No", "TCP-C", "UDP-C", "TCP-S", "UDP-S", "COM"}
 )
 
 // GetCliFlag runs an interactive configuration wizard when no port is specified.

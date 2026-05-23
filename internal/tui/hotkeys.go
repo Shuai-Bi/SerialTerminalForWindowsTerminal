@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"strconv"
 	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -145,4 +146,36 @@ func completionBase(line string) string {
 		return ""
 	}
 	return line[:i+1]
+}
+
+func parseCSIuBytes(b []byte) (string, bool) {
+	s := string(b)
+	if !strings.HasPrefix(s, "\x1b[") || !strings.HasSuffix(s, "u") {
+		return "", false
+	}
+	inner := s[2 : len(s)-1]
+	parts := strings.SplitN(inner, ";", 2)
+	if len(parts) != 2 {
+		return "", false
+	}
+	cp, err := strconv.Atoi(parts[0])
+	if err != nil || cp < 'a' || cp > 'z' {
+		return "", false
+	}
+	mod, err := strconv.Atoi(parts[1])
+	if err != nil {
+		return "", false
+	}
+	var seq []string
+	if mod&4 != 0 {
+		seq = append(seq, "ctrl")
+	}
+	if mod&2 != 0 {
+		seq = append(seq, "alt")
+	}
+	if mod&1 != 0 {
+		seq = append(seq, "shift")
+	}
+	seq = append(seq, string(rune(cp)))
+	return strings.Join(seq, "+"), true
 }

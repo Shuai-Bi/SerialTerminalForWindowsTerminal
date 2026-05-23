@@ -189,13 +189,15 @@ func RunConsole(appInst *apppkg.App) error {
 					break
 				}
 				escBuf = append(escBuf, nb)
-				if nb >= 0x40 && nb <= 0x7e {
+				// 2-byte non-CSI: ESC + letter (not [)
+				if len(escBuf) == 2 && escBuf[1] != '[' {
 					if flushESC(escBuf) {
 						return nil
 					}
 					break
 				}
-				if len(escBuf) == 2 && escBuf[1] != '[' {
+				// CSI terminator: final byte of ESC [ ... <char> sequence
+				if len(escBuf) > 2 && escBuf[1] == '[' && nb >= 0x40 && nb <= 0x7e {
 					if flushESC(escBuf) {
 						return nil
 					}

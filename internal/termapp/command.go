@@ -439,8 +439,14 @@ func (d *CommandDispatcher) handleModeCommand(args []string) error {
 
 	switch field {
 	case "in":
+		if value == "" {
+			return fmt.Errorf("input charset must not be empty")
+		}
 		d.app.cfg.InputCode = value
 	case "out":
+		if value == "" {
+			return fmt.Errorf("output charset must not be empty")
+		}
 		d.app.cfg.OutputCode = value
 	case "end":
 		d.app.cfg.EndStr = value
@@ -457,6 +463,9 @@ func (d *CommandDispatcher) handleModeCommand(args []string) error {
 		}
 		d.app.cfg.TimesTamp = enabled
 	case "timefmt":
+		if value == "" && d.app.cfg.TimesTamp {
+			return fmt.Errorf("timestamp format must not be empty")
+		}
 		d.app.cfg.TimesFmt = value
 	default:
 		return fmt.Errorf("unknown mode field: %s", field)

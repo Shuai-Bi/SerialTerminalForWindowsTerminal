@@ -101,11 +101,11 @@ func (m *uiModel) handleViewportKey(msg tea.KeyMsg) bool {
 		m.viewport, cmd = m.viewport.Update(msg)
 		_ = cmd
 		return true
-	case "home", "g":
+	case "home":
 		m.viewport.GotoTop()
 		m.followTail = false
 		return true
-	case "end", "shift+g":
+	case "end":
 		m.viewport.GotoBottom()
 		m.followTail = true
 		return true

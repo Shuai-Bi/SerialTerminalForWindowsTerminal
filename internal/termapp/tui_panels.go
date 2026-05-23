@@ -71,7 +71,14 @@ func (m *uiModel) refreshPanel() {
 }
 
 func (m *uiModel) buildModeItems() []modeItem {
-	return []modeItem{{"in", "Input Charset", m.app.cfg.InputCode}, {"out", "Output Charset", m.app.cfg.OutputCode}, {"end", "Line End", fmt.Sprintf("%q", m.app.cfg.EndStr)}, {"frame", "Hex Frame Size", fmt.Sprintf("%d", m.app.cfg.FrameSize)}, {"timestamp", "Timestamp", fmt.Sprintf("%v", m.app.cfg.TimesTamp)}, {"timefmt", "Timestamp Format", m.app.cfg.TimesFmt}}
+	return []modeItem{
+		{"in", "Input Charset", m.app.cfg.InputCode, m.app.cfg.InputCode},
+		{"out", "Output Charset", m.app.cfg.OutputCode, m.app.cfg.OutputCode},
+		{"end", "Line End", fmt.Sprintf("%q", m.app.cfg.EndStr), m.app.cfg.EndStr},
+		{"frame", "Hex Frame Size", fmt.Sprintf("%d", m.app.cfg.FrameSize), fmt.Sprintf("%d", m.app.cfg.FrameSize)},
+		{"timestamp", "Timestamp", fmt.Sprintf("%v", m.app.cfg.TimesTamp), fmt.Sprintf("%v", m.app.cfg.TimesTamp)},
+		{"timefmt", "Timestamp Format", m.app.cfg.TimesFmt, m.app.cfg.TimesFmt},
+	}
 }
 
 func (m *uiModel) handleForwardPanelKey(key string) bool {
@@ -222,7 +229,7 @@ func (m *uiModel) handleModePanelKey(key string) bool {
 		}
 		return true
 	case "enter", "e":
-		initial := strings.Trim(sel.value, "\"")
+		initial := sel.rawValue
 		m.startPrompt("Edit Mode: "+sel.label, "new value", initial, func(v string) {
 			m.app.handleLine(fmt.Sprintf(".mode set %s %s", sel.key, v))
 			m.refreshPanel()

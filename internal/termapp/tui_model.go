@@ -16,9 +16,10 @@ import (
 type doneMsg struct{}
 
 type modeItem struct {
-	key   string
-	label string
-	value string
+	key      string
+	label    string
+	value    string
+	rawValue string
 }
 
 type panelLine struct {

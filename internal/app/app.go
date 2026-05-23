@@ -1,4 +1,5 @@
-package termapp
+// Package app provides the core application coordinator.
+package app
 
 import (
 	"bytes"
@@ -13,16 +14,23 @@ import (
 
 	appconfig "github.com/jixishi/SerialTerminalForWindowsTerminal/internal/config"
 	"github.com/jixishi/SerialTerminalForWindowsTerminal/internal/event"
+	"github.com/jixishi/SerialTerminalForWindowsTerminal/internal/session"
 	"github.com/jixishi/SerialTerminalForWindowsTerminal/pkg/charset"
 	"github.com/jixishi/SerialTerminalForWindowsTerminal/pkg/forward"
 	"github.com/jixishi/SerialTerminalForWindowsTerminal/pkg/luaplugin"
+
+	"github.com/jixishi/SerialTerminalForWindowsTerminal/internal/command"
 )
 
+// App is the central coordinator for the serial terminal application.
 type App struct {
-	cfg        *Config
+	cfg  *appconfig.Config
+	sess *session.SerialSession
+	out  io.Writer
+
 	forward    *forward.Manager
 	plugins    *luaplugin.Manager
-	dispatcher *CommandDispatcher
+	dispatcher *command.Dispatcher
 
 	uiEvents chan event.UIEvent
 	done     chan struct{}
@@ -35,7 +43,10 @@ type App struct {
 	logFile *os.File
 }
 
-func NewApp(cfg *Config) (*App, error) {
+var _ command.CommandHost = (*App)(nil)
+
+// New creates a new App with the given configuration, session, and output writer.
+func New(cfg *appconfig.Config, sess *session.SerialSession, out io.Writer) (*App, error) {
 	f, err := appconfig.OpenLogFile(cfg)
 	if err != nil {
 		return nil, err
@@ -43,6 +54,8 @@ func NewApp(cfg *Config) (*App, error) {
 
 	a := &App{
 		cfg:      cfg,
+		sess:     sess,
+		out:      out,
 		plugins:  luaplugin.NewManager(),
 		uiEvents: make(chan event.UIEvent, 512),
 		done:     make(chan struct{}),
@@ -52,12 +65,31 @@ func NewApp(cfg *Config) (*App, error) {
 
 	a.forward = forward.NewManager(a.writeRawToSession, a.Notifyf)
 	a.forward.SetInboundReporter(a.reportForwardIngress)
-	a.dispatcher = NewCommandDispatcher(a)
+	a.dispatcher = command.NewDispatcher(a)
 	if err = a.loadDefaultDemoPlugin(); err != nil {
 		return nil, err
 	}
 	return a, nil
 }
+
+// --- command.CommandHost implementation ---
+
+func (a *App) Cfg() *appconfig.Config        { return a.cfg }
+func (a *App) Forward() *forward.Manager     { return a.forward }
+func (a *App) Plugins() *luaplugin.Manager   { return a.plugins }
+func (a *App) WriteToSession(data []byte) error { return a.writeToSession(data) }
+
+// --- exported accessors for TUI / console ---
+
+func (a *App) UIEvents() <-chan event.UIEvent { return a.uiEvents }
+func (a *App) WaitDone() <-chan struct{}       { return a.done }
+func (a *App) SendCtrl(letter byte) error      { return a.sendCtrl(letter) }
+func (a *App) HandleLine(line string)          { a.handleLine(line) }
+func (a *App) Dispatcher() *command.Dispatcher  { return a.dispatcher }
+func (a *App) StartOutputLoop()                { a.startOutputLoop() }
+func (a *App) LoadConfiguredForwards()          { a.loadConfiguredForwards() }
+func (a *App) Sess() *session.SerialSession    { return a.sess }
+func (a *App) Out() io.Writer                  { return a.out }
 
 func (a *App) loadDefaultDemoPlugin() error {
 	demoPath := filepath.Join("plugins", "demo.lua")
@@ -107,14 +139,14 @@ func (a *App) emit(ev event.UIEvent) {
 	if !a.UIEnabled() {
 		switch ev.Kind {
 		case event.UIEventOutput:
-			_, _ = io.WriteString(out, ev.Text)
+			_, _ = io.WriteString(a.out, ev.Text)
 		case event.UIEventStatus:
-			_, _ = io.WriteString(out, ev.Text)
+			_, _ = io.WriteString(a.out, ev.Text)
 			if !strings.HasSuffix(ev.Text, "\n") {
-				_, _ = io.WriteString(out, "\n")
+				_, _ = io.WriteString(a.out, "\n")
 			}
 		case event.UIEventModal:
-			_, _ = io.WriteString(out, "\n["+ev.Title+"]\n"+ev.Text+"\n")
+			_, _ = io.WriteString(a.out, "\n["+ev.Title+"]\n"+ev.Text+"\n")
 		}
 		if ev.Kind == event.UIEventOutput {
 			a.appendLog(ev.Text)
@@ -125,7 +157,6 @@ func (a *App) emit(ev event.UIEvent) {
 	select {
 	case a.uiEvents <- ev:
 	default:
-		// Keep UI responsive; drop oldest when overloaded.
 		select {
 		case <-a.uiEvents:
 		default:
@@ -142,12 +173,7 @@ func (a *App) appendLog(text string) {
 	if a.logFile == nil {
 		return
 	}
-
 	_, _ = a.logFile.WriteString(text)
-}
-
-func (a *App) isClosed() bool {
-	return a.closedFlag.Load()
 }
 
 func (a *App) Close() {
@@ -156,16 +182,11 @@ func (a *App) Close() {
 		close(a.done)
 		a.forward.Close()
 		a.plugins.Close()
-		sess.Close()
-		
+		a.sess.Close()
 		if a.logFile != nil {
 			_ = a.logFile.Close()
 		}
 	})
-}
-
-func (a *App) waitDone() <-chan struct{} {
-	return a.done
 }
 
 func (a *App) loadConfiguredForwards() {
@@ -192,12 +213,10 @@ func (a *App) reportForwardIngress(id int, chunk []byte) {
 	if len(chunk) == 0 {
 		return
 	}
-
 	if strings.EqualFold(a.cfg.InputCode, "hex") {
 		a.Notifyf("[forward#%d -> serial] % X\n", id, chunk)
 		return
 	}
-
 	converted, err := charset.ConvertChunk(chunk, a.cfg.InputCode, a.cfg.OutputCode)
 	if err != nil {
 		converted = bytes.Clone(chunk)
@@ -213,10 +232,9 @@ func (a *App) writeRawToSession(data []byte) error {
 	if len(data) == 0 {
 		return nil
 	}
-
 	a.stdinMu.Lock()
 	defer a.stdinMu.Unlock()
-	_, err := sess.StdinPipe.Write(data)
+	_, err := a.sess.StdinPipe.Write(data)
 	return err
 }
 
@@ -228,7 +246,6 @@ func (a *App) writeToSession(data []byte) error {
 	if len(processed) == 0 {
 		return nil
 	}
-
 	return a.writeRawToSession(processed)
 }
 
@@ -236,7 +253,6 @@ func (a *App) sendLine(line string) error {
 	if strings.TrimSpace(line) == "" {
 		return nil
 	}
-
 	payload := append([]byte(line), []byte(a.cfg.EndStr)...)
 	return a.writeToSession(payload)
 }
@@ -246,7 +262,7 @@ func (a *App) sendCtrl(letter byte) error {
 		letter = letter + ('a' - 'A')
 	}
 	control := []byte{letter & 0x1f}
-	_, err := sess.Port.Write(control)
+	_, err := a.sess.Port.Write(control)
 	return err
 }
 
@@ -288,7 +304,6 @@ func (a *App) startOutputLoop() {
 		go a.readHexOutput()
 		return
 	}
-
 	go a.readTextOutput()
 }
 
@@ -300,7 +315,7 @@ func (a *App) readHexOutput() {
 
 	buf := make([]byte, frameSize)
 	for {
-		n, err := sess.StdoutPipe.Read(buf)
+		n, err := a.sess.StdoutPipe.Read(buf)
 		if n > 0 {
 			chunk := make([]byte, n)
 			copy(chunk, buf[:n])
@@ -333,7 +348,7 @@ func (a *App) readHexOutput() {
 func (a *App) readTextOutput() {
 	buf := make([]byte, 4096)
 	for {
-		n, err := sess.StdoutPipe.Read(buf)
+		n, err := a.sess.StdoutPipe.Read(buf)
 		if n > 0 {
 			chunk := make([]byte, n)
 			copy(chunk, buf[:n])
@@ -379,7 +394,6 @@ func prefixLines(s, prefix string) string {
 	if s == "" || prefix == "" {
 		return s
 	}
-
 	lines := strings.SplitAfter(s, "\n")
 	for i, line := range lines {
 		if line == "" {

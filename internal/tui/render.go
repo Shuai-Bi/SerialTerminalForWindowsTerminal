@@ -1,4 +1,4 @@
-package termapp
+package tui
 
 import (
 	"strings"
@@ -6,7 +6,7 @@ import (
 	"github.com/charmbracelet/lipgloss"
 )
 
-func (m *uiModel) appendOutput(text string) {
+func (m *Model) appendOutput(text string) {
 	if text == "" {
 		return
 	}
@@ -19,7 +19,7 @@ func (m *uiModel) appendOutput(text string) {
 	}
 }
 
-func (m *uiModel) renderPrompt() string {
+func (m *Model) renderPrompt() string {
 	lines := []boxLine{
 		{text: m.promptHint, style: modalBodyLineStyle()},
 		{text: m.promptInput.View(), style: modalBodyLineStyle()},
@@ -80,37 +80,13 @@ func renderCenteredModalContent(width, height int, content string) string {
 	if width <= 0 || height <= 0 {
 		return content
 	}
-
-	lines := strings.Split(content, "\n")
-	blockWidth := 0
-	for _, line := range lines {
-		blockWidth = maxInt(blockWidth, lipgloss.Width(line))
-	}
-	blockHeight := len(lines)
-	leftPad := 0
-	if width > blockWidth {
-		leftPad = (width - blockWidth) / 2
-	}
-	topPad := 0
-	if height > blockHeight {
-		topPad = (height - blockHeight) / 2
-	}
-
-	var b strings.Builder
-	for i := 0; i < topPad; i++ {
-		b.WriteByte('\n')
-	}
-	for i, line := range lines {
-		if i > 0 {
-			b.WriteByte('\n')
-		}
-		b.WriteString(strings.Repeat(" ", leftPad))
-		b.WriteString(line)
-	}
-	return b.String()
+	return lipgloss.Place(width, height, lipgloss.Center, lipgloss.Center, content,
+		lipgloss.WithWhitespaceChars(" "),
+		lipgloss.WithWhitespaceForeground(lipgloss.Color("0")),
+	)
 }
 
-func (m *uiModel) availableModalWidth() int {
+func (m *Model) availableModalWidth() int {
 	if m.width <= 0 {
 		return 100
 	}
@@ -134,8 +110,9 @@ func renderBox(title string, lines []boxLine, minWidth, maxWidth int) string {
 	contentWidth = maxInt(minWidth, contentWidth)
 	contentWidth = minInt(contentWidth, maxWidth)
 
-	top := "╭" + strings.Repeat("─", contentWidth+2) + "╮"
-	bottom := "╰" + strings.Repeat("─", contentWidth+2) + "╯"
+	boxStyle := lipgloss.NewStyle().Background(lipgloss.Color("236"))
+	top := boxStyle.Render("╭" + strings.Repeat("─", contentWidth+2) + "╮")
+	bottom := boxStyle.Render("╰" + strings.Repeat("─", contentWidth+2) + "╯")
 
 	rows := make([]string, 0, len(lines)+3)
 	rows = append(rows, top)
@@ -150,8 +127,8 @@ func renderBox(title string, lines []boxLine, minWidth, maxWidth int) string {
 func renderBoxRow(contentStyle lipgloss.Style, text string, width int) string {
 	visible := truncateToWidth(text, width)
 	pad := strings.Repeat(" ", maxInt(0, width-lipgloss.Width(visible)))
-	inner := contentStyle.Render(visible) + pad
-	return "│ " + inner + " │"
+	inner := contentStyle.Render(" " + visible + pad + " ")
+	return contentStyle.Render("│" + inner + "│")
 }
 
 func modalHeaderLineStyle() lipgloss.Style {
@@ -169,7 +146,6 @@ func modalFooterLineStyle() lipgloss.Style {
 func selectedPanelLineStyle() lipgloss.Style {
 	return lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("230")).Background(lipgloss.Color("31"))
 }
-
 
 func truncateToWidth(s string, width int) string {
 	if width <= 0 || lipgloss.Width(s) <= width {

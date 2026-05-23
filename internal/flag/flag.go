@@ -46,6 +46,10 @@ func Init(cfg *config.Config) {
 }
 
 // Normalize converts single-dash long flags (e.g. -port) to double-dash (--port).
+// Parse wraps pflag.Parse.
+func Parse() { pflag.Parse() }
+
+// Normalize converts single-dash long flags (e.g. -port) to double-dash (--port).
 func Normalize() {
 	known := map[string]bool{
 		"port": true, "baud": true, "data": true, "stop": true,

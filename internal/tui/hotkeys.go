@@ -1,4 +1,4 @@
-package termapp
+package tui
 
 import (
 	"strings"
@@ -7,28 +7,28 @@ import (
 	"github.com/jixishi/SerialTerminalForWindowsTerminal/internal/event"
 )
 
-func handleLocalHotkey(m *uiModel, key string) bool {
+func handleLocalHotkey(m *Model, key string) bool {
 	if m.isLocalHotkey(key, "h") {
-		modifier := strings.ToUpper(normalizeHotkeyPrefix(m.app.cfg.HotkeyMod))
-		m.app.ShowModal("Shortcuts", modifier+"+C => local exit\nCtrl+C => remote interrupt\n"+modifier+"+F => forward panel\n"+modifier+"+P => plugin panel\n"+modifier+"+M => mode panel\nF1 => shortcut help")
+		modifier := strings.ToUpper(normalizeHotkeyPrefix(m.App.Cfg().HotkeyMod))
+		m.App.ShowModal("Shortcuts", modifier+"+C => local exit\nCtrl+C => remote interrupt\n"+modifier+"+F => forward panel\n"+modifier+"+P => plugin panel\n"+modifier+"+M => mode panel\nF1 => shortcut help")
 		return true
 	}
 	if m.isLocalHotkey(key, "f") {
-		m.app.OpenPanel(event.UIPanelForward)
+		m.App.OpenPanel(event.UIPanelForward)
 		return true
 	}
 	if m.isLocalHotkey(key, "p") {
-		m.app.OpenPanel(event.UIPanelPlugin)
+		m.App.OpenPanel(event.UIPanelPlugin)
 		return true
 	}
 	if m.isLocalHotkey(key, "m") {
-		m.app.OpenPanel(event.UIPanelMode)
+		m.App.OpenPanel(event.UIPanelMode)
 		return true
 	}
 	return false
 }
 
-func (m *uiModel) isLocalHotkey(key, action string) bool {
+func (m *Model) isLocalHotkey(key, action string) bool {
 	parts := strings.Split(strings.ToLower(key), "+")
 	if len(parts) < 2 || parts[len(parts)-1] != action {
 		return false
@@ -48,7 +48,7 @@ func (m *uiModel) isLocalHotkey(key, action string) bool {
 		}
 	}
 
-	mod := normalizeHotkeyPrefix(m.app.cfg.HotkeyMod)
+	mod := normalizeHotkeyPrefix(m.App.Cfg().HotkeyMod)
 	if mod == "ctrl+shift" {
 		return hasCtrl && hasShift
 	}
@@ -83,7 +83,7 @@ func parseCtrlKey(key string) (byte, bool) {
 	return ch, true
 }
 
-func (m *uiModel) handleViewportKey(msg tea.KeyMsg) bool {
+func (m *Model) handleViewportKey(msg tea.KeyMsg) bool {
 	if !m.ready || m.showModal {
 		return false
 	}
@@ -114,14 +114,14 @@ func (m *uiModel) handleViewportKey(msg tea.KeyMsg) bool {
 	}
 }
 
-func (m *uiModel) resetCompletion() {
+func (m *Model) resetCompletion() {
 	m.completionActive = false
 	m.completionBase = ""
 	m.completionCandidates = nil
 	m.completionIndex = 0
 }
 
-func (m *uiModel) stepCompletion(direction int) {
+func (m *Model) stepCompletion(direction int) {
 	if len(m.completionCandidates) == 0 {
 		m.resetCompletion()
 		return
@@ -134,7 +134,7 @@ func (m *uiModel) stepCompletion(direction int) {
 	m.applyCompletion()
 }
 
-func (m *uiModel) applyCompletion() {
+func (m *Model) applyCompletion() {
 	if len(m.completionCandidates) == 0 {
 		return
 	}

@@ -1,26 +1,25 @@
-package termapp
+// Package console provides the non-TUI console mode.
+package console
 
 import (
 	"fmt"
-	tea "github.com/charmbracelet/bubbletea"
-	"github.com/spf13/pflag"
 	"io"
-	"log"
 	"os"
 	"os/signal"
 	"strconv"
 	"strings"
 
+	tea "github.com/charmbracelet/bubbletea"
+	"golang.org/x/term"
+
+	apppkg "github.com/jixishi/SerialTerminalForWindowsTerminal/internal/app"
+	"github.com/jixishi/SerialTerminalForWindowsTerminal/internal/config"
 	"github.com/jixishi/SerialTerminalForWindowsTerminal/internal/flag"
 	"github.com/jixishi/SerialTerminalForWindowsTerminal/internal/session"
-	"golang.org/x/term"
+	"github.com/jixishi/SerialTerminalForWindowsTerminal/internal/tui"
 )
 
-func init() {
-	log.SetFlags(log.Ldate | log.Ltime | log.Lshortfile | log.Lmsgprefix)
-	flag.Init(cfg)
-}
-
+// Run parses flags, sets up the session and app, then runs TUI or console mode.
 func Run() {
 	defer func() {
 		if r := recover(); r != nil {
@@ -29,12 +28,15 @@ func Run() {
 		}
 	}()
 
+	cfg := &config.Config{}
+	flag.Init(cfg)
 	flag.Normalize()
-	pflag.Parse()
+	flag.Parse()
 	flag.Ext(cfg)
 	if cfg.PortName == "" {
 		flag.GetCliFlag(cfg)
 	}
+
 	ports, err := session.CheckPortAvailability(cfg.PortName)
 	if err != nil {
 		fmt.Println(err)
@@ -42,27 +44,27 @@ func Run() {
 		os.Exit(0)
 	}
 
-	sess, err = session.Open(cfg)
+	sess, err := session.Open(cfg)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "open session failed: %v\n", err)
 		os.Exit(1)
 	}
 
-	app, err := NewApp(cfg)
+	appInst, err := apppkg.New(cfg, sess, os.Stdout)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "create app failed: %v\n", err)
 		os.Exit(1)
 	}
-	defer app.Close()
+	defer appInst.Close()
 
-	app.loadConfiguredForwards()
-	app.startOutputLoop()
+	appInst.LoadConfiguredForwards()
+	appInst.StartOutputLoop()
 
-	go forwardInterruptToRemote(app)
-	app.SetUIEnabled(cfg.EnableGUI)
+	go forwardInterruptToRemote(appInst)
+	appInst.SetUIEnabled(cfg.EnableGUI)
 
 	if cfg.EnableGUI {
-		model := newUIModel(app)
+		model := tui.New(appInst)
 		p := tea.NewProgram(model, tea.WithAltScreen(), tea.WithoutSignalHandler())
 		if _, err = p.Run(); err != nil {
 			fmt.Fprintf(os.Stderr, "tui failed: %v\n", err)
@@ -71,32 +73,33 @@ func Run() {
 		return
 	}
 
-	if err = runConsole(app); err != nil {
+	if err = RunConsole(appInst); err != nil {
 		fmt.Fprintf(os.Stderr, "console failed: %v\n", err)
 		os.Exit(1)
 	}
 }
 
-func forwardInterruptToRemote(app *App) {
+func forwardInterruptToRemote(appInst *apppkg.App) {
 	sigCh := make(chan os.Signal, 1)
 	signal.Notify(sigCh, os.Interrupt)
 	defer signal.Stop(sigCh)
 
 	for {
 		select {
-		case <-app.waitDone():
+		case <-appInst.WaitDone():
 			return
 		case <-sigCh:
-			if err := app.sendCtrl('c'); err != nil {
-				app.Notifyf("[signal] interrupt pass-through failed: %v", err)
+			if err := appInst.SendCtrl('c'); err != nil {
+				appInst.Notifyf("[signal] interrupt pass-through failed: %v", err)
 				continue
 			}
-			app.Notifyf("[signal] Ctrl+C forwarded to remote")
+			appInst.Notifyf("[signal] Ctrl+C forwarded to remote")
 		}
 	}
 }
 
-func runConsole(app *App) error {
+// RunConsole runs the non-TUI console mode.
+func RunConsole(appInst *apppkg.App) error {
 	fd := int(os.Stdin.Fd())
 	isTerm := term.IsTerminal(fd)
 	var oldState *term.State
@@ -107,15 +110,12 @@ func runConsole(app *App) error {
 		if err != nil {
 			return err
 		}
-		defer func() {
-			_ = term.Restore(fd, oldState)
-		}()
+		defer func() { _ = term.Restore(fd, oldState) }()
 	}
 
-	app.Notifyf("[console] non-gui mode, commands start with '.' at line start\n")
-	app.Notifyf("[console] Ctrl+<Key> passes through to remote; .exit to exit")
+	appInst.Notifyf("[console] non-gui mode, commands start with '.' at line start\n")
+	appInst.Notifyf("[console] Ctrl+<Key> passes through to remote; .exit to exit")
 
-	// Read with a larger buffer so multi-byte sequences (arrows, CSI) arrive together.
 	ch := make(chan byte, 1024)
 	errCh := make(chan error, 1)
 	go func() {
@@ -132,6 +132,8 @@ func runConsole(app *App) error {
 		}
 	}()
 
+	out := appInst.Out()
+	cfg := appInst.Cfg()
 	lineStart := true
 	commandMode := false
 	cmdBuf := make([]byte, 0, 128)
@@ -147,7 +149,7 @@ func runConsole(app *App) error {
 
 	readByte := func() (byte, error) {
 		select {
-		case <-app.waitDone():
+		case <-appInst.WaitDone():
 			return 0, io.EOF
 		case rdErr := <-errCh:
 			return 0, rdErr
@@ -156,14 +158,13 @@ func runConsole(app *App) error {
 		}
 	}
 
-	// flushESC sends a fully-built escape sequence to serial.
 	flushESC := func(seq []byte) bool {
-		if isExitHotkeySeq(seq) {
-			app.Close()
+		if isExitHotkeySeq(seq, cfg) {
+			appInst.Close()
 			return true
 		}
-		if err = app.writeToSession(seq); err != nil {
-			app.Statusf("[send] %v", err)
+		if err = appInst.WriteToSession(seq); err != nil {
+			appInst.Statusf("[send] %v", err)
 		}
 		return false
 	}
@@ -177,39 +178,32 @@ func runConsole(app *App) error {
 			return rdErr
 		}
 
-		// ── Escape sequences (VT / CSI) ──
 		if b == 0x1b {
-			// Try to read the rest without blocking.
 			escBuf := []byte{0x1b}
 			for {
 				nb, ok := tryRead()
 				if !ok {
-					// Standalone ESC — send it now.
-					if err = app.writeToSession([]byte{0x1b}); err != nil {
-						app.Statusf("[send] %v", err)
+					if err = appInst.WriteToSession([]byte{0x1b}); err != nil {
+						appInst.Statusf("[send] %v", err)
 					}
 					break
 				}
 				escBuf = append(escBuf, nb)
-				// CSI terminator byte (0x40–0x7E): A–Z, a–z, ~, etc.
 				if nb >= 0x40 && nb <= 0x7e {
 					if flushESC(escBuf) {
 						return nil
 					}
 					break
 				}
-				// Short non-CSI sequence (e.g. ESC c).
 				if len(escBuf) == 2 && escBuf[1] != '[' {
 					if flushESC(escBuf) {
 						return nil
 					}
 					break
 				}
-				// CSI parameter bytes (digits, semicolons, etc.) — keep collecting.
 				if len(escBuf) > 16 {
-					// Too long, just flush.
-					if err = app.writeToSession(escBuf); err != nil {
-						app.Statusf("[send] %v", err)
+					if err = appInst.WriteToSession(escBuf); err != nil {
+						appInst.Statusf("[send] %v", err)
 					}
 					break
 				}
@@ -217,20 +211,18 @@ func runConsole(app *App) error {
 			continue
 		}
 
-		// ── Windows Alt+key: NULL prefix ──
 		if b == 0x00 {
 			if b2, ok := tryRead(); ok {
-				if isAltKeyExit(b2) {
-					app.Close()
+				if isAltKeyExit(b2, cfg) {
+					appInst.Close()
 					return nil
 				}
-				if err = app.writeToSession([]byte{0x00, b2}); err != nil {
-					app.Statusf("[send] %v", err)
+				if err = appInst.WriteToSession([]byte{0x00, b2}); err != nil {
+					appInst.Statusf("[send] %v", err)
 				}
 			} else {
-				// No second byte available — send NULL alone.
-				if err = app.writeToSession([]byte{0x00}); err != nil {
-					app.Statusf("[send] %v", err)
+				if err = appInst.WriteToSession([]byte{0x00}); err != nil {
+					appInst.Statusf("[send] %v", err)
 				}
 			}
 			if commandMode {
@@ -239,14 +231,13 @@ func runConsole(app *App) error {
 			continue
 		}
 
-		// ── Command mode ──
 		if commandMode {
 			switch b {
 			case '\r', '\n':
-				echoConsoleNewline()
+				echoConsoleNewline(out)
 				line := string(cmdBuf)
 				if strings.TrimSpace(line) != "" {
-					app.handleLine(line)
+					appInst.HandleLine(line)
 				}
 				commandMode = false
 				cmdBuf = cmdBuf[:0]
@@ -254,42 +245,41 @@ func runConsole(app *App) error {
 			case 0x7f, 0x08:
 				if len(cmdBuf) > 0 {
 					cmdBuf = cmdBuf[:len(cmdBuf)-1]
-					echoConsoleBackspace()
+					echoConsoleBackspace(out)
 				}
-			case 0x09: // Tab — command completion
-				line, cands := app.dispatcher.Complete(string(cmdBuf))
+			case 0x09:
+				line, cands := appInst.Dispatcher().Complete(string(cmdBuf))
 				if len(cands) == 1 {
 					cmdBuf = append(cmdBuf[:0], line...)
-					echoRedrawCommand(line)
+					echoRedrawCommand(out, line)
 				} else if len(cands) > 1 {
-					echoConsoleNewline()
-					app.Notifyf("%s", strings.Join(cands, "  "))
-					echoConsoleByte('.')
-					echoConsoleString(string(cmdBuf[1:]))
+					echoConsoleNewline(out)
+					appInst.Notifyf("%s", strings.Join(cands, "  "))
+					echoConsoleByte(out, '.')
+					echoConsoleString(out, string(cmdBuf[1:]))
 				}
 			default:
 				cmdBuf = append(cmdBuf, b)
-				echoConsoleByte(b)
+				echoConsoleByte(out, b)
 			}
 			continue
 		}
 
-		// ── Normal mode (sending to remote) ──
 		if lineStart && b == '.' {
 			commandMode = true
 			cmdBuf = append(cmdBuf[:0], b)
-			echoConsoleByte(b)
+			echoConsoleByte(out, b)
 			continue
 		}
 
 		if b == '\r' || b == '\n' {
-			if err = app.writeToSession([]byte(cfg.EndStr)); err != nil {
-				app.Statusf("[send] %v", err)
+			if err = appInst.WriteToSession([]byte(cfg.EndStr)); err != nil {
+				appInst.Statusf("[send] %v", err)
 			}
 			lineStart = true
 		} else {
-			if err = app.writeToSession([]byte{b}); err != nil {
-				app.Statusf("[send] %v", err)
+			if err = appInst.WriteToSession([]byte{b}); err != nil {
+				appInst.Statusf("[send] %v", err)
 			}
 			lineStart = false
 		}
@@ -297,7 +287,6 @@ func runConsole(app *App) error {
 }
 
 func parseCSIu(seq []byte) (cp int, mod int, ok bool) {
-	// ESC [ codepoint ; modifier u
 	if len(seq) < 6 {
 		return 0, 0, false
 	}
@@ -323,20 +312,15 @@ func parseCSIu(seq []byte) (cp int, mod int, ok bool) {
 	return cp, mod, true
 }
 
-func isAltKeyExit(b byte) bool {
-	if normalizeHotkeyPrefix(cfg.HotkeyMod) != "ctrl+alt" {
+func isAltKeyExit(b byte, cfg *config.Config) bool {
+	if normalizeHotkey(cfg.HotkeyMod) != "ctrl+alt" {
 		return false
 	}
-	// 0x2E = scan code for 'C', 0x03 = Ctrl+C, 0x63 = 'c', 0x43 = 'C'
 	return b == 0x2e || b == 0x03 || b == 0x63 || b == 0x43
 }
 
-func isExitHotkeySeq(seq []byte) bool {
-	mod := normalizeHotkeyPrefix(cfg.HotkeyMod)
-
-	// CSI u format: ESC [ codepoint ; modifier u
-	// Only matches when the Ctrl modifier bit (4) is present,
-	// distinguishing Ctrl+Alt+C from Alt+C alone.
+func isExitHotkeySeq(seq []byte, cfg *config.Config) bool {
+	mod := normalizeHotkey(cfg.HotkeyMod)
 	if cp, cmod, ok := parseCSIu(seq); ok {
 		if cp != 'c' && cp != 'C' {
 			return false
@@ -349,26 +333,19 @@ func isExitHotkeySeq(seq []byte) bool {
 		}
 		return false
 	}
-
 	return false
 }
 
-func echoConsoleByte(b byte) {
-	_, _ = out.Write([]byte{b})
+func normalizeHotkey(mod string) string {
+	mod = strings.ToLower(strings.TrimSpace(mod))
+	if mod != "ctrl+alt" && mod != "ctrl+shift" {
+		mod = "ctrl+alt"
+	}
+	return mod
 }
 
-func echoConsoleNewline() {
-	_, _ = io.WriteString(out, "\r\n")
-}
-
-func echoConsoleBackspace() {
-	_, _ = io.WriteString(out, "\b \b")
-}
-
-func echoConsoleString(s string) {
-	_, _ = io.WriteString(out, s)
-}
-
-func echoRedrawCommand(s string) {
-	_, _ = io.WriteString(out, "\r\033[K> "+s)
-}
+func echoConsoleByte(out io.Writer, b byte)        { _, _ = out.Write([]byte{b}) }
+func echoConsoleNewline(out io.Writer)              { _, _ = io.WriteString(out, "\r\n") }
+func echoConsoleBackspace(out io.Writer)            { _, _ = io.WriteString(out, "\b \b") }
+func echoConsoleString(out io.Writer, s string)     { _, _ = io.WriteString(out, s) }
+func echoRedrawCommand(out io.Writer, s string)     { _, _ = io.WriteString(out, "\r\033[K> "+s) }

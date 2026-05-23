@@ -1,4 +1,4 @@
-package termapp
+package tui
 
 import (
 	"fmt"
@@ -8,6 +8,8 @@ import (
 	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+
+	"github.com/jixishi/SerialTerminalForWindowsTerminal/internal/app"
 	"github.com/jixishi/SerialTerminalForWindowsTerminal/internal/event"
 	"github.com/jixishi/SerialTerminalForWindowsTerminal/pkg/forward"
 	"github.com/jixishi/SerialTerminalForWindowsTerminal/pkg/luaplugin"
@@ -27,8 +29,8 @@ type panelLine struct {
 	selected bool
 }
 
-type uiModel struct {
-	app *App
+type Model struct {
+	App *app.App
 
 	viewport viewport.Model
 	input    textinput.Model
@@ -47,6 +49,7 @@ type uiModel struct {
 
 	panelKind  event.UIPanelKind
 	panelIndex int
+	panelError string
 
 	forwardItems []forward.Snapshot
 	pluginItems  []luaplugin.Snapshot
@@ -64,21 +67,19 @@ type uiModel struct {
 	completionIndex      int
 }
 
-func newUIModel(app *App) *uiModel {
+func New(application *app.App) *Model {
 	in := textinput.New()
-	// bubbles v0.18.0 computes placeholder width using display cells,
-	// which can panic on CJK placeholders. Keep this ASCII-only.
 	in.Placeholder = "Type to send to remote, use .help for commands"
 	in.Focus()
 	in.CharLimit = 0
 	in.Prompt = "> "
 	in.Width = 80
 
-	return &uiModel{app: app, input: in, followTail: true}
+	return &Model{App: application, input: in, followTail: true}
 }
 
-func (m *uiModel) Init() tea.Cmd {
-	return tea.Batch(waitUIEvent(m.app.uiEvents), waitDone(m.app.waitDone()), textinput.Blink)
+func (m *Model) Init() tea.Cmd {
+	return tea.Batch(waitUIEvent(m.App.UIEvents()), waitDone(m.App.WaitDone()), textinput.Blink)
 }
 
 func waitUIEvent(ch <-chan event.UIEvent) tea.Cmd {
@@ -98,7 +99,7 @@ func waitDone(ch <-chan struct{}) tea.Cmd {
 	}
 }
 
-func (m *uiModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case doneMsg:
 		return m, tea.Quit
@@ -120,7 +121,7 @@ func (m *uiModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case event.UIEventPanel:
 			m.openPanel(msg.Panel)
 		}
-		return m, waitUIEvent(m.app.uiEvents)
+		return m, waitUIEvent(m.App.UIEvents())
 
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
@@ -156,13 +157,16 @@ func (m *uiModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.resetCompletion()
 		}
 
-		if m.showModal && m.handleModalKey(msg) {
-			return m, nil
+		if m.showModal {
+			handled, cmd := m.handleModalKey(msg)
+			if handled {
+				return m, cmd
+			}
 		}
 
 		if m.isLocalHotkey(keyStr, "c") {
-			m.app.Statusf("[local] exiting by %s+C", strings.ToUpper(normalizeHotkeyPrefix(m.app.cfg.HotkeyMod)))
-			m.app.Close()
+			m.App.Statusf("[local] exiting by %s+C", strings.ToUpper(normalizeHotkeyPrefix(m.App.Cfg().HotkeyMod)))
+			m.App.Close()
 			return m, tea.Quit
 		}
 
@@ -170,22 +174,21 @@ func (m *uiModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 
-		// Some terminals can't encode Ctrl+Alt/Shift+H distinctly and report Ctrl+H.
 		if keyStr == "ctrl+h" {
-			handleLocalHotkey(m, hotkeyWith(m.app.cfg.HotkeyMod, "h"))
+			handleLocalHotkey(m, hotkeyWith(m.App.Cfg().HotkeyMod, "h"))
 			return m, nil
 		}
 
 		if letter, ok := parseCtrlKey(keyStr); ok {
-			if err := m.app.sendCtrl(letter); err != nil {
-				m.app.Notifyf("[remote] ctrl send failed: %v", err)
+			if err := m.App.SendCtrl(letter); err != nil {
+				m.App.Notifyf("[remote] ctrl send failed: %v", err)
 			}
 			return m, nil
 		}
 
 		switch keyStr {
 		case "f1":
-			handleLocalHotkey(m, hotkeyWith(m.app.cfg.HotkeyMod, "h"))
+			handleLocalHotkey(m, hotkeyWith(m.App.Cfg().HotkeyMod, "h"))
 			return m, nil
 
 		case "tab", "shift+tab":
@@ -199,7 +202,7 @@ func (m *uiModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return m, nil
 			}
 
-			line, cands := m.app.dispatcher.Complete(m.input.Value())
+			line, cands := m.App.Dispatcher().Complete(m.input.Value())
 			m.suggestions = cands
 			if len(cands) == 0 {
 				return m, nil
@@ -225,7 +228,7 @@ func (m *uiModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.input.SetValue("")
 			m.suggestions = nil
 			m.followTail = true
-			m.app.handleLine(line)
+			m.App.HandleLine(line)
 			return m, nil
 		}
 	}
@@ -235,7 +238,7 @@ func (m *uiModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, cmd
 }
 
-func (m *uiModel) View() string {
+func (m *Model) View() string {
 	if !m.ready {
 		return "Initializing..."
 	}
@@ -246,7 +249,7 @@ func (m *uiModel) View() string {
 	} else if len(m.suggestions) == 1 {
 		suggest = "Tab: " + m.suggestions[0]
 	}
-	modifier := strings.ToUpper(normalizeHotkeyPrefix(m.app.cfg.HotkeyMod))
+	modifier := strings.ToUpper(normalizeHotkeyPrefix(m.App.Cfg().HotkeyMod))
 	hotkeys := "Hotkeys: Ctrl+C remote | " + modifier + "+C local | " + modifier + "+F forward | " + modifier + "+P plugins | " + modifier + "+M mode | F1 help"
 	hotkeys = lipgloss.NewStyle().Faint(true).Foreground(lipgloss.Color("245")).Render(hotkeys)
 	status := m.statusLine

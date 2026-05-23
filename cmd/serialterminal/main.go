@@ -1,7 +1,15 @@
 package main
 
-import "github.com/jixishi/SerialTerminalForWindowsTerminal/internal/termapp"
+import (
+	"log"
+
+	"github.com/jixishi/SerialTerminalForWindowsTerminal/internal/console"
+)
+
+func init() {
+	log.SetFlags(log.Ldate | log.Ltime | log.Lshortfile | log.Lmsgprefix)
+}
 
 func main() {
-	termapp.Run()
+	console.Run()
 }

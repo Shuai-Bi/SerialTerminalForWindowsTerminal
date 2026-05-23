@@ -7,6 +7,7 @@ import (
 
 	"github.com/spf13/pflag"
 
+	appconfig "github.com/jixishi/SerialTerminalForWindowsTerminal/internal/config"
 	"github.com/jixishi/SerialTerminalForWindowsTerminal/pkg/forward"
 )
 
@@ -55,16 +56,16 @@ func TestParseForwardMode(t *testing.T) {
 }
 
 func TestOpenLogFile(t *testing.T) {
-	old := config
-	defer func() { config = old }()
+	old := *cfg
+	defer func() { *cfg = old }()
 
-	config = Config{
-		enableLog:   true,
-		portName:    "COM1",
-		logFilePath: filepath.Join(t.TempDir(), "%s-%s.log"),
+	*cfg = Config{
+		EnableLog:   true,
+		PortName:    "COM1",
+		LogFilePath: filepath.Join(t.TempDir(), "%s-%s.log"),
 	}
 
-	f, err := openLogFile()
+	f, err := appconfig.OpenLogFile(cfg)
 	if err != nil {
 		t.Fatalf("openLogFile() unexpected error: %v", err)
 	}
@@ -73,8 +74,8 @@ func TestOpenLogFile(t *testing.T) {
 	}
 	_ = f.Close()
 
-	config.enableLog = false
-	f, err = openLogFile()
+	cfg.EnableLog = false
+	f, err = appconfig.OpenLogFile(cfg)
 	if err != nil {
 		t.Fatalf("openLogFile() unexpected error with enableLog=false: %v", err)
 	}
@@ -114,55 +115,55 @@ func TestFlagFindValue(t *testing.T) {
 }
 
 func TestFlagExt(t *testing.T) {
-	old := config
-	defer func() { config = old }()
+	old := *cfg
+	defer func() { *cfg = old }()
 
-	config = Config{}
+	*cfg = Config{}
 	flagExt()
-	if config.enableLog {
+	if cfg.EnableLog {
 		t.Fatalf("expected enableLog=false when logFilePath empty")
 	}
-	if config.timesTamp {
+	if cfg.TimesTamp {
 		t.Fatalf("expected timesTamp=false when timesFmt empty")
 	}
-	if config.hotkeyMod != "ctrl+alt" {
-		t.Fatalf("expected default hotkeyMod=ctrl+alt, got=%q", config.hotkeyMod)
+	if cfg.HotkeyMod != "ctrl+alt" {
+		t.Fatalf("expected default hotkeyMod=ctrl+alt, got=%q", cfg.HotkeyMod)
 	}
 
-	config = Config{logFilePath: "/tmp/log.txt"}
+	*cfg = Config{LogFilePath: "/tmp/log.txt"}
 	flagExt()
-	if !config.enableLog {
+	if !cfg.EnableLog {
 		t.Fatalf("expected enableLog=true when logFilePath set")
 	}
 
-	config = Config{timesFmt: "2006-01-02"}
+	*cfg = Config{TimesFmt: "2006-01-02"}
 	flagExt()
-	if !config.timesTamp {
+	if !cfg.TimesTamp {
 		t.Fatalf("expected timesTamp=true when timesFmt set")
 	}
 
-	config = Config{hotkeyMod: ""}
+	*cfg = Config{HotkeyMod: ""}
 	flagExt()
-	if config.hotkeyMod != "ctrl+alt" {
+	if cfg.HotkeyMod != "ctrl+alt" {
 		t.Fatalf("empty hotkeyMod should default to ctrl+alt")
 	}
 
-	config = Config{hotkeyMod: "ctrl+shift"}
+	*cfg = Config{HotkeyMod: "ctrl+shift"}
 	flagExt()
-	if config.hotkeyMod != "ctrl+shift" {
+	if cfg.HotkeyMod != "ctrl+shift" {
 		t.Fatalf("expected ctrl+shift preserved")
 	}
 
-	config = Config{hotkeyMod: "  CTRL+SHIFT  "}
+	*cfg = Config{HotkeyMod: "  CTRL+SHIFT  "}
 	flagExt()
-	if config.hotkeyMod != "ctrl+shift" {
-		t.Fatalf("expected whitespace+case normalization, got=%q", config.hotkeyMod)
+	if cfg.HotkeyMod != "ctrl+shift" {
+		t.Fatalf("expected whitespace+case normalization, got=%q", cfg.HotkeyMod)
 	}
 
-	config = Config{hotkeyMod: "invalid"}
+	*cfg = Config{HotkeyMod: "invalid"}
 	flagExt()
-	if config.hotkeyMod != "ctrl+alt" {
-		t.Fatalf("invalid hotkeyMod should default to ctrl+alt, got=%q", config.hotkeyMod)
+	if cfg.HotkeyMod != "ctrl+alt" {
+		t.Fatalf("invalid hotkeyMod should default to ctrl+alt, got=%q", cfg.HotkeyMod)
 	}
 }
 

@@ -32,10 +32,10 @@ func main() {
 	normalizeFlags()
 	pflag.Parse()
 	flagExt()
-	if config.portName == "" {
+	if cfg.PortName == "" {
 		getCliFlag()
 	}
-	ports, err := checkPortAvailability(config.portName)
+	ports, err := checkPortAvailability(cfg.PortName)
 	if err != nil {
 		fmt.Println(err)
 		printUsage(ports)
@@ -52,7 +52,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	app, err := NewApp(&config)
+	app, err := NewApp(cfg)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "create app failed: %v\n", err)
 		os.Exit(1)
@@ -63,9 +63,9 @@ func main() {
 	app.startOutputLoop()
 
 	go forwardInterruptToRemote(app)
-	app.SetUIEnabled(config.enableGUI)
+	app.SetUIEnabled(cfg.EnableGUI)
 
-	if config.enableGUI {
+	if cfg.EnableGUI {
 		model := newUIModel(app)
 		p := tea.NewProgram(model, tea.WithAltScreen(), tea.WithoutSignalHandler())
 		if _, err = p.Run(); err != nil {
@@ -287,7 +287,7 @@ func runConsole(app *App) error {
 		}
 
 		if b == '\r' || b == '\n' {
-			if err = app.writeToSession([]byte(config.endStr)); err != nil {
+			if err = app.writeToSession([]byte(cfg.EndStr)); err != nil {
 				app.Statusf("[send] %v", err)
 			}
 			lineStart = true
@@ -328,7 +328,7 @@ func parseCSIu(seq []byte) (cp int, mod int, ok bool) {
 }
 
 func isAltKeyExit(b byte) bool {
-	if normalizeHotkeyPrefix(config.hotkeyMod) != "ctrl+alt" {
+	if normalizeHotkeyPrefix(cfg.HotkeyMod) != "ctrl+alt" {
 		return false
 	}
 	// 0x2E = scan code for 'C', 0x03 = Ctrl+C, 0x63 = 'c', 0x43 = 'C'
@@ -336,7 +336,7 @@ func isAltKeyExit(b byte) bool {
 }
 
 func isExitHotkeySeq(seq []byte) bool {
-	mod := normalizeHotkeyPrefix(config.hotkeyMod)
+	mod := normalizeHotkeyPrefix(cfg.HotkeyMod)
 
 	// CSI u format: ESC [ codepoint ; modifier u
 	// Only matches when the Ctrl modifier bit (4) is present,

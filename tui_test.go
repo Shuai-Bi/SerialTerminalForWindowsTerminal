@@ -42,7 +42,7 @@ func TestRenderModal(t *testing.T) {
 }
 
 func TestHandleCtrlShiftLocalHelp(t *testing.T) {
-	a := &App{uiEvents: make(chan event.UIEvent, 4), cfg: &Config{hotkeyMod: "ctrl+alt"}}
+	a := &App{uiEvents: make(chan event.UIEvent, 4), cfg: &Config{HotkeyMod: "ctrl+alt"}}
 	a.SetUIEnabled(true)
 	m := uiModel{app: a}
 
@@ -103,7 +103,7 @@ func TestIsLocalHotkeyAll(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		a := &App{cfg: &Config{hotkeyMod: tt.mod}}
+		a := &App{cfg: &Config{HotkeyMod: tt.mod}}
 		m := uiModel{app: a}
 		got := m.isLocalHotkey(tt.key, tt.action)
 		if got != tt.want {
@@ -216,7 +216,7 @@ func TestMaxIntFunc(t *testing.T) {
 }
 
 func TestHandleLocalHotkeyForward(t *testing.T) {
-	a := &App{uiEvents: make(chan event.UIEvent, 4), cfg: &Config{hotkeyMod: "ctrl+alt"}}
+	a := &App{uiEvents: make(chan event.UIEvent, 4), cfg: &Config{HotkeyMod: "ctrl+alt"}}
 	a.SetUIEnabled(true)
 	m := uiModel{app: a}
 
@@ -230,7 +230,7 @@ func TestHandleLocalHotkeyForward(t *testing.T) {
 }
 
 func TestHandleLocalHotkeyPlugin(t *testing.T) {
-	a := &App{uiEvents: make(chan event.UIEvent, 4), cfg: &Config{hotkeyMod: "ctrl+alt"}}
+	a := &App{uiEvents: make(chan event.UIEvent, 4), cfg: &Config{HotkeyMod: "ctrl+alt"}}
 	a.SetUIEnabled(true)
 	m := uiModel{app: a}
 
@@ -244,7 +244,7 @@ func TestHandleLocalHotkeyPlugin(t *testing.T) {
 }
 
 func TestHandleLocalHotkeyMode(t *testing.T) {
-	a := &App{uiEvents: make(chan event.UIEvent, 4), cfg: &Config{hotkeyMod: "ctrl+alt"}}
+	a := &App{uiEvents: make(chan event.UIEvent, 4), cfg: &Config{HotkeyMod: "ctrl+alt"}}
 	a.SetUIEnabled(true)
 	m := uiModel{app: a}
 
@@ -258,7 +258,7 @@ func TestHandleLocalHotkeyMode(t *testing.T) {
 }
 
 func TestHandleLocalHotkeyUnknown(t *testing.T) {
-	a := &App{cfg: &Config{hotkeyMod: "ctrl+alt"}}
+	a := &App{cfg: &Config{HotkeyMod: "ctrl+alt"}}
 	m := uiModel{app: a}
 
 	if handleLocalHotkey(&m, "ctrl+alt+x") {
@@ -267,7 +267,7 @@ func TestHandleLocalHotkeyUnknown(t *testing.T) {
 }
 
 func TestHandleLocalHotkeyCtrlShift(t *testing.T) {
-	a := &App{uiEvents: make(chan event.UIEvent, 4), cfg: &Config{hotkeyMod: "ctrl+shift"}}
+	a := &App{uiEvents: make(chan event.UIEvent, 4), cfg: &Config{HotkeyMod: "ctrl+shift"}}
 	a.SetUIEnabled(true)
 	m := uiModel{app: a}
 

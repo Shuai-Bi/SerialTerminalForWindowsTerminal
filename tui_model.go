@@ -160,7 +160,7 @@ func (m *uiModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 
 		if m.isLocalHotkey(keyStr, "c") {
-			m.app.Statusf("[local] exiting by %s+C", strings.ToUpper(normalizeHotkeyPrefix(m.app.cfg.hotkeyMod)))
+			m.app.Statusf("[local] exiting by %s+C", strings.ToUpper(normalizeHotkeyPrefix(m.app.cfg.HotkeyMod)))
 			m.app.Close()
 			return m, tea.Quit
 		}
@@ -171,7 +171,7 @@ func (m *uiModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		// Some terminals can't encode Ctrl+Alt/Shift+H distinctly and report Ctrl+H.
 		if keyStr == "ctrl+h" {
-			handleLocalHotkey(m, hotkeyWith(m.app.cfg.hotkeyMod, "h"))
+			handleLocalHotkey(m, hotkeyWith(m.app.cfg.HotkeyMod, "h"))
 			return m, nil
 		}
 
@@ -184,7 +184,7 @@ func (m *uiModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		switch keyStr {
 		case "f1":
-			handleLocalHotkey(m, hotkeyWith(m.app.cfg.hotkeyMod, "h"))
+			handleLocalHotkey(m, hotkeyWith(m.app.cfg.HotkeyMod, "h"))
 			return m, nil
 
 		case "tab", "shift+tab":
@@ -245,7 +245,7 @@ func (m *uiModel) View() string {
 	} else if len(m.suggestions) == 1 {
 		suggest = "Tab: " + m.suggestions[0]
 	}
-	modifier := strings.ToUpper(normalizeHotkeyPrefix(m.app.cfg.hotkeyMod))
+	modifier := strings.ToUpper(normalizeHotkeyPrefix(m.app.cfg.HotkeyMod))
 	hotkeys := "Hotkeys: Ctrl+C remote | " + modifier + "+C local | " + modifier + "+F forward | " + modifier + "+P plugins | " + modifier + "+M mode | F1 help"
 	hotkeys = lipgloss.NewStyle().Faint(true).Foreground(lipgloss.Color("245")).Render(hotkeys)
 	status := m.statusLine

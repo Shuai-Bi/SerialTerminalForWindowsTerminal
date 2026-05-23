@@ -26,7 +26,7 @@ func setupTestPipes() {
 
 func newTestAppForCommand() *App {
 	a := &App{
-		cfg:      &Config{inputCode: "UTF-8", outputCode: "UTF-8", endStr: "\n"},
+		cfg:      &Config{InputCode: "UTF-8", OutputCode: "UTF-8", EndStr: "\n"},
 		plugins:  luaplugin.NewManager(),
 		uiEvents: make(chan event.UIEvent, 32),
 		done:     make(chan struct{}),
@@ -149,15 +149,15 @@ func TestCommandExecuteModeSet(t *testing.T) {
 	if err != nil || !handled {
 		t.Fatalf(".mode set end failed handled=%v err=%v", handled, err)
 	}
-	if a.cfg.endStr != "\\r\\n" {
-		t.Fatalf("mode set end not applied, got=%q", a.cfg.endStr)
+	if a.cfg.EndStr != "\\r\\n" {
+		t.Fatalf("mode set end not applied, got=%q", a.cfg.EndStr)
 	}
 
 	handled, err = a.dispatcher.Execute(".mode set timestamp on")
 	if err != nil || !handled {
 		t.Fatalf(".mode set timestamp failed handled=%v err=%v", handled, err)
 	}
-	if !a.cfg.timesTamp {
+	if !a.cfg.TimesTamp {
 		t.Fatalf("mode set timestamp should enable timesTamp")
 	}
 }
@@ -298,32 +298,32 @@ func TestCommandExecuteModeSetAll(t *testing.T) {
 	if err != nil || !handled {
 		t.Fatalf(".mode set frame failed: handled=%v err=%v", handled, err)
 	}
-	if a.cfg.frameSize != 32 {
-		t.Fatalf("frameSize not set, got=%d", a.cfg.frameSize)
+	if a.cfg.FrameSize != 32 {
+		t.Fatalf("frameSize not set, got=%d", a.cfg.FrameSize)
 	}
 
 	handled, err = a.dispatcher.Execute(".mode set timefmt 2006")
 	if err != nil || !handled {
 		t.Fatalf(".mode set timefmt failed: handled=%v err=%v", handled, err)
 	}
-	if a.cfg.timesFmt != "2006" {
-		t.Fatalf("timesFmt not set, got=%q", a.cfg.timesFmt)
+	if a.cfg.TimesFmt != "2006" {
+		t.Fatalf("timesFmt not set, got=%q", a.cfg.TimesFmt)
 	}
 
 	handled, err = a.dispatcher.Execute(".mode set out GBK")
 	if err != nil || !handled {
 		t.Fatalf(".mode set out failed: handled=%v err=%v", handled, err)
 	}
-	if a.cfg.outputCode != "GBK" {
-		t.Fatalf("outputCode not set, got=%q", a.cfg.outputCode)
+	if a.cfg.OutputCode != "GBK" {
+		t.Fatalf("outputCode not set, got=%q", a.cfg.OutputCode)
 	}
 
 	handled, err = a.dispatcher.Execute(".mode set in GBK")
 	if err != nil || !handled {
 		t.Fatalf(".mode set in failed: handled=%v err=%v", handled, err)
 	}
-	if a.cfg.inputCode != "GBK" {
-		t.Fatalf("inputCode not set, got=%q", a.cfg.inputCode)
+	if a.cfg.InputCode != "GBK" {
+		t.Fatalf("inputCode not set, got=%q", a.cfg.InputCode)
 	}
 }
 

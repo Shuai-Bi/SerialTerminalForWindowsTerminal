@@ -9,7 +9,7 @@ import (
 
 func handleLocalHotkey(m *uiModel, key string) bool {
 	if m.isLocalHotkey(key, "h") {
-		modifier := strings.ToUpper(normalizeHotkeyPrefix(m.app.cfg.hotkeyMod))
+		modifier := strings.ToUpper(normalizeHotkeyPrefix(m.app.cfg.HotkeyMod))
 		m.app.ShowModal("Shortcuts", modifier+"+C => local exit\nCtrl+C => remote interrupt\n"+modifier+"+F => forward panel\n"+modifier+"+P => plugin panel\n"+modifier+"+M => mode panel\nF1 => shortcut help")
 		return true
 	}
@@ -48,7 +48,7 @@ func (m *uiModel) isLocalHotkey(key, action string) bool {
 		}
 	}
 
-	mod := normalizeHotkeyPrefix(m.app.cfg.hotkeyMod)
+	mod := normalizeHotkeyPrefix(m.app.cfg.HotkeyMod)
 	if mod == "ctrl+shift" {
 		return hasCtrl && hasShift
 	}

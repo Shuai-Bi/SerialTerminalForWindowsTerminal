@@ -60,10 +60,10 @@ func TestParseCSIu(t *testing.T) {
 }
 
 func TestIsExitHotkeySeq(t *testing.T) {
-	oldCfg := config
-	defer func() { config = oldCfg }()
+	oldCfg := *cfg
+	defer func() { *cfg = oldCfg }()
 
-	config = Config{hotkeyMod: "ctrl+alt"}
+	*cfg = Config{HotkeyMod: "ctrl+alt"}
 
 	// CSI u Ctrl+Alt+C (mod=6)
 	if !isExitHotkeySeq([]byte{0x1b, '[', '9', '9', ';', '6', 'u'}) {
@@ -88,7 +88,7 @@ func TestIsExitHotkeySeq(t *testing.T) {
 	}
 
 	// Switch to ctrl+shift
-	config = Config{hotkeyMod: "ctrl+shift"}
+	*cfg = Config{HotkeyMod: "ctrl+shift"}
 
 	if !isExitHotkeySeq([]byte{0x1b, '[', '9', '9', ';', '5', 'u'}) {
 		t.Fatalf("Ctrl+Shift+C should exit with ctrl+shift config")
@@ -111,7 +111,7 @@ func TestIsExitHotkeySeq(t *testing.T) {
 		t.Fatalf("plain bytes should not exit")
 	}
 
-	config = Config{hotkeyMod: "ctrl+alt"}
+	*cfg = Config{HotkeyMod: "ctrl+alt"}
 	// Ctrl only (mod=4) should not exit (requires Alt too)
 	if isExitHotkeySeq([]byte{0x1b, '[', '9', '9', ';', '4', 'u'}) {
 		t.Fatalf("Ctrl+C (without Alt) should not exit")

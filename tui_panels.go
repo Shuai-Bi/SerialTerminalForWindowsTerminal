@@ -71,7 +71,7 @@ func (m *uiModel) refreshPanel() {
 }
 
 func (m *uiModel) buildModeItems() []modeItem {
-	return []modeItem{{"in", "Input Charset", m.app.cfg.inputCode}, {"out", "Output Charset", m.app.cfg.outputCode}, {"end", "Line End", fmt.Sprintf("%q", m.app.cfg.endStr)}, {"frame", "Hex Frame Size", fmt.Sprintf("%d", m.app.cfg.frameSize)}, {"timestamp", "Timestamp", fmt.Sprintf("%v", m.app.cfg.timesTamp)}, {"timefmt", "Timestamp Format", m.app.cfg.timesFmt}}
+	return []modeItem{{"in", "Input Charset", m.app.cfg.InputCode}, {"out", "Output Charset", m.app.cfg.OutputCode}, {"end", "Line End", fmt.Sprintf("%q", m.app.cfg.EndStr)}, {"frame", "Hex Frame Size", fmt.Sprintf("%d", m.app.cfg.FrameSize)}, {"timestamp", "Timestamp", fmt.Sprintf("%v", m.app.cfg.TimesTamp)}, {"timefmt", "Timestamp Format", m.app.cfg.TimesFmt}}
 }
 
 func (m *uiModel) handleForwardPanelKey(key string) bool {
@@ -213,7 +213,7 @@ func (m *uiModel) handleModePanelKey(key string) bool {
 	switch key {
 	case " ":
 		if sel.key == "timestamp" {
-			if m.app.cfg.timesTamp {
+			if m.app.cfg.TimesTamp {
 				m.app.handleLine(".mode set timestamp off")
 			} else {
 				m.app.handleLine(".mode set timestamp on")

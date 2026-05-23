@@ -61,7 +61,7 @@ func TestAppUIEvents(t *testing.T) {
 func TestSendLine(t *testing.T) {
 	setupTestPipes()
 	a := &App{
-		cfg:      &Config{endStr: "\r\n"},
+		cfg:      &Config{EndStr: "\r\n"},
 		plugins:  luaplugin.NewManager(),
 		uiEvents: make(chan event.UIEvent, 8),
 		done:     make(chan struct{}),
@@ -83,7 +83,7 @@ func TestSendLine(t *testing.T) {
 func TestHandleLine(t *testing.T) {
 	setupTestPipes()
 	a := &App{
-		cfg:      &Config{endStr: "\n", inputCode: "UTF-8", outputCode: "UTF-8"},
+		cfg:      &Config{EndStr: "\n", InputCode: "UTF-8", OutputCode: "UTF-8"},
 		plugins:  luaplugin.NewManager(),
 		uiEvents: make(chan event.UIEvent, 8),
 		done:     make(chan struct{}),
@@ -159,22 +159,19 @@ func TestAppClose(t *testing.T) {
 }
 
 func TestLoadConfiguredForwards(t *testing.T) {
-	oldCfg := config
-	defer func() { config = oldCfg }()
-
 	listener, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
 		t.Fatalf("listen failed: %v", err)
 	}
 	defer listener.Close()
 
-	config = Config{
-		forWard: []int{int(forward.TCP), int(forward.None), int(forward.UDP)},
-		address: []string{listener.Addr().String(), "", ""},
+	testCfg := &Config{
+		ForWard: []int{int(forward.TCP), int(forward.None), int(forward.UDP)},
+		Address: []string{listener.Addr().String(), "", ""},
 	}
 
 	a := &App{
-		cfg:      &config,
+		cfg:      testCfg,
 		forward:  forward.NewManager(func([]byte) error { return nil }, func(string, ...any) {}),
 		uiEvents: make(chan event.UIEvent, 8),
 		done:     make(chan struct{}),
@@ -191,7 +188,7 @@ func TestLoadConfiguredForwards(t *testing.T) {
 
 func TestReportForwardIngress(t *testing.T) {
 	a := &App{
-		cfg:      &Config{inputCode: "UTF-8", outputCode: "UTF-8"},
+		cfg:      &Config{InputCode: "UTF-8", OutputCode: "UTF-8"},
 		uiEvents: make(chan event.UIEvent, 4),
 	}
 	a.SetUIEnabled(true)
@@ -199,7 +196,7 @@ func TestReportForwardIngress(t *testing.T) {
 	a.reportForwardIngress(1, []byte("test"))
 
 	// Hex mode
-	a.cfg.inputCode = "hex"
+	a.cfg.InputCode = "hex"
 	a.reportForwardIngress(2, []byte{0x41, 0x42})
 
 	// Empty chunk

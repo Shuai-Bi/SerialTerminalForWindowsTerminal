@@ -34,13 +34,13 @@ func checkPortAvailability(name string) ([]string, error) {
 
 func OpenSerial() error {
 	mode := &serial.Mode{
-		BaudRate: config.baudRate,
-		StopBits: serial.StopBits(config.stopBits),
-		DataBits: config.dataBits,
-		Parity:   serial.Parity(config.parityBit),
+		BaudRate: cfg.BaudRate,
+		StopBits: serial.StopBits(cfg.StopBits),
+		DataBits: cfg.DataBits,
+		Parity:   serial.Parity(cfg.ParityBit),
 	}
 	var err error
-	serialPort, err = serial.Open(config.portName, mode)
+	serialPort, err = serial.Open(cfg.PortName, mode)
 	return err
 }
 

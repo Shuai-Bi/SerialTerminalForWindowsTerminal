@@ -11,6 +11,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	appconfig "github.com/jixishi/SerialTerminalForWindowsTerminal/internal/config"
 	"github.com/jixishi/SerialTerminalForWindowsTerminal/internal/event"
 	"github.com/jixishi/SerialTerminalForWindowsTerminal/pkg/charset"
 	"github.com/jixishi/SerialTerminalForWindowsTerminal/pkg/forward"
@@ -35,7 +36,7 @@ type App struct {
 }
 
 func NewApp(cfg *Config) (*App, error) {
-	f, err := openLogFile()
+	f, err := appconfig.OpenLogFile(cfg)
 	if err != nil {
 		return nil, err
 	}
@@ -168,16 +169,16 @@ func (a *App) waitDone() <-chan struct{} {
 }
 
 func (a *App) loadConfiguredForwards() {
-	for i, mode := range config.forWard {
+	for i, mode := range a.cfg.ForWard {
 		m := forward.Mode(mode)
 		if m == forward.None {
 			continue
 		}
-		if i >= len(config.address) {
+		if i >= len(a.cfg.Address) {
 			a.Notifyf("[forward] skip #%d: missing address", i)
 			continue
 		}
-		addr := strings.TrimSpace(config.address[i])
+		addr := strings.TrimSpace(a.cfg.Address[i])
 		if addr == "" {
 			continue
 		}
@@ -192,12 +193,12 @@ func (a *App) reportForwardIngress(id int, chunk []byte) {
 		return
 	}
 
-	if strings.EqualFold(a.cfg.inputCode, "hex") {
+	if strings.EqualFold(a.cfg.InputCode, "hex") {
 		a.Notifyf("[forward#%d -> serial] % X\n", id, chunk)
 		return
 	}
 
-	converted, err := charset.ConvertChunk(chunk, a.cfg.inputCode, a.cfg.outputCode)
+	converted, err := charset.ConvertChunk(chunk, a.cfg.InputCode, a.cfg.OutputCode)
 	if err != nil {
 		converted = bytes.Clone(chunk)
 	}
@@ -236,7 +237,7 @@ func (a *App) sendLine(line string) error {
 		return nil
 	}
 
-	payload := append([]byte(line), []byte(a.cfg.endStr)...)
+	payload := append([]byte(line), []byte(a.cfg.EndStr)...)
 	return a.writeToSession(payload)
 }
 
@@ -283,7 +284,7 @@ func (a *App) handleLine(line string) {
 }
 
 func (a *App) startOutputLoop() {
-	if strings.EqualFold(a.cfg.inputCode, "hex") {
+	if strings.EqualFold(a.cfg.InputCode, "hex") {
 		go a.readHexOutput()
 		return
 	}
@@ -292,7 +293,7 @@ func (a *App) startOutputLoop() {
 }
 
 func (a *App) readHexOutput() {
-	frameSize := a.cfg.frameSize
+	frameSize := a.cfg.FrameSize
 	if frameSize <= 0 {
 		frameSize = 16
 	}
@@ -312,7 +313,7 @@ func (a *App) readHexOutput() {
 			if len(outChunk) == 0 {
 				continue
 			}
-			a.emit(event.UIEvent{Kind: event.UIEventOutput, Text: charset.FormatHexFrame(outChunk, a.cfg.timesTamp, a.cfg.timesFmt)})
+			a.emit(event.UIEvent{Kind: event.UIEventOutput, Text: charset.FormatHexFrame(outChunk, a.cfg.TimesTamp, a.cfg.TimesFmt)})
 		}
 		if err != nil {
 			if err != io.EOF {
@@ -347,15 +348,15 @@ func (a *App) readTextOutput() {
 				continue
 			}
 
-			converted, convErr := charset.ConvertChunk(outChunk, a.cfg.inputCode, a.cfg.outputCode)
+			converted, convErr := charset.ConvertChunk(outChunk, a.cfg.InputCode, a.cfg.OutputCode)
 			if convErr != nil {
 				a.Notifyf("[output] convert failed: %v", convErr)
 				converted = bytes.Clone(outChunk)
 			}
 
 			text := string(converted)
-			if a.cfg.timesTamp {
-				text = prefixLines(text, time.Now().Format(a.cfg.timesFmt)+" ")
+			if a.cfg.TimesTamp {
+				text = prefixLines(text, time.Now().Format(a.cfg.TimesFmt)+" ")
 			}
 			a.emit(event.UIEvent{Kind: event.UIEventOutput, Text: text})
 		}

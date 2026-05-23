@@ -414,13 +414,13 @@ func (d *CommandDispatcher) handleModeCommand(args []string) error {
 		}
 
 		d.app.Notifyf("[mode] input=%s output=%s end=%q hex=%v frame=%d timestamp=%v timefmt=%q forwardTargets=%d plugins=%d",
-			d.app.cfg.inputCode,
-			d.app.cfg.outputCode,
-			d.app.cfg.endStr,
-			strings.EqualFold(d.app.cfg.inputCode, "hex"),
-			d.app.cfg.frameSize,
-			d.app.cfg.timesTamp,
-			d.app.cfg.timesFmt,
+			d.app.cfg.InputCode,
+			d.app.cfg.OutputCode,
+			d.app.cfg.EndStr,
+			strings.EqualFold(d.app.cfg.InputCode, "hex"),
+			d.app.cfg.FrameSize,
+			d.app.cfg.TimesTamp,
+			d.app.cfg.TimesFmt,
 			len(d.app.forward.List()),
 			len(d.app.plugins.List()),
 		)
@@ -439,25 +439,25 @@ func (d *CommandDispatcher) handleModeCommand(args []string) error {
 
 	switch field {
 	case "in":
-		d.app.cfg.inputCode = value
+		d.app.cfg.InputCode = value
 	case "out":
-		d.app.cfg.outputCode = value
+		d.app.cfg.OutputCode = value
 	case "end":
-		d.app.cfg.endStr = value
+		d.app.cfg.EndStr = value
 	case "frame":
 		n, err := strconv.Atoi(value)
 		if err != nil || n <= 0 {
 			return fmt.Errorf("frame must be a positive integer")
 		}
-		d.app.cfg.frameSize = n
+		d.app.cfg.FrameSize = n
 	case "timestamp":
 		enabled, ok := parseOnOff(value)
 		if !ok {
 			return fmt.Errorf("timestamp value must be on/off")
 		}
-		d.app.cfg.timesTamp = enabled
+		d.app.cfg.TimesTamp = enabled
 	case "timefmt":
-		d.app.cfg.timesFmt = value
+		d.app.cfg.TimesFmt = value
 	default:
 		return fmt.Errorf("unknown mode field: %s", field)
 	}

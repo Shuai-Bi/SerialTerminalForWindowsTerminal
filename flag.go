@@ -47,21 +47,21 @@ type Flag struct {
 }
 
 var (
-	portName   = Flag{ptrVal{string: &config.portName}, "p", "port", Val{string: ""}, "要连接的串口\t(/dev/ttyUSB0、COMx)"}
-	baudRate   = Flag{ptrVal{int: &config.baudRate}, "b", "baud", Val{int: 115200}, "波特率"}
-	dataBits   = Flag{ptrVal{int: &config.dataBits}, "d", "data", Val{int: 8}, "数据位"}
-	stopBits   = Flag{ptrVal{int: &config.stopBits}, "s", "stop", Val{int: 0}, "停止位停止位(0: 1停止 1:1.5停止 2:2停止)"}
-	outputCode = Flag{ptrVal{string: &config.outputCode}, "o", "out", Val{string: "UTF-8"}, "输出编码"}
-	inputCode  = Flag{ptrVal{string: &config.inputCode}, "i", "in", Val{string: "UTF-8"}, "输入编码"}
-	endStr     = Flag{ptrVal{string: &config.endStr}, "e", "end", Val{string: "\n"}, "终端换行符"}
-	logExt     = Flag{v: ptrVal{ext: &config.logFilePath}, sStr: "l", lStr: "log", dv: Val{extdef: "./%s-$s.txt", string: ""}, help: "日志保存路径"}
-	timeExt    = Flag{v: ptrVal{ext: &config.timesFmt}, sStr: "t", lStr: "time", dv: Val{extdef: "[06-01-02 15:04:05.000]", string: ""}, help: "时间戳格式化字段"}
-	forWard    = Flag{ptrVal{il: &config.forWard}, "f", "forward", Val{int: 0}, "转发模式(0: 无 1:TCP-C 2:UDP-C 支持多次传入)"}
-	address    = Flag{ptrVal{sl: &config.address}, "a", "address", Val{string: "127.0.0.1:12345"}, "转发服务地址(支持多次传入)"}
-	frameSize  = Flag{ptrVal{int: &config.frameSize}, "F", "Frame", Val{int: 16}, "帧大小"}
-	parityBit  = Flag{ptrVal{int: &config.parityBit}, "v", "verify", Val{int: 0}, "奇偶校验(0:无校验、1:奇校验、2:偶校验、3:1校验、4:0校验)"}
-	guiMode    = Flag{ptrVal{bool: &config.enableGUI}, "g", "gui", Val{bool: false}, "启用TUI交互界面"}
-	hotkeyMod  = Flag{ptrVal{string: &config.hotkeyMod}, "k", "hotkey-mod", Val{string: "ctrl+alt"}, "本地快捷键修饰(ctrl+alt|ctrl+shift)"}
+	portName   = Flag{ptrVal{string: &cfg.PortName}, "p", "port", Val{string: ""}, "要连接的串口\t(/dev/ttyUSB0、COMx)"}
+	baudRate   = Flag{ptrVal{int: &cfg.BaudRate}, "b", "baud", Val{int: 115200}, "波特率"}
+	dataBits   = Flag{ptrVal{int: &cfg.DataBits}, "d", "data", Val{int: 8}, "数据位"}
+	stopBits   = Flag{ptrVal{int: &cfg.StopBits}, "s", "stop", Val{int: 0}, "停止位停止位(0: 1停止 1:1.5停止 2:2停止)"}
+	outputCode = Flag{ptrVal{string: &cfg.OutputCode}, "o", "out", Val{string: "UTF-8"}, "输出编码"}
+	inputCode  = Flag{ptrVal{string: &cfg.InputCode}, "i", "in", Val{string: "UTF-8"}, "输入编码"}
+	endStr     = Flag{ptrVal{string: &cfg.EndStr}, "e", "end", Val{string: "\n"}, "终端换行符"}
+	logExt     = Flag{v: ptrVal{ext: &cfg.LogFilePath}, sStr: "l", lStr: "log", dv: Val{extdef: "./%s-$s.txt", string: ""}, help: "日志保存路径"}
+	timeExt    = Flag{v: ptrVal{ext: &cfg.TimesFmt}, sStr: "t", lStr: "time", dv: Val{extdef: "[06-01-02 15:04:05.000]", string: ""}, help: "时间戳格式化字段"}
+	forWard    = Flag{ptrVal{il: &cfg.ForWard}, "f", "forward", Val{int: 0}, "转发模式(0: 无 1:TCP-C 2:UDP-C 支持多次传入)"}
+	address    = Flag{ptrVal{sl: &cfg.Address}, "a", "address", Val{string: "127.0.0.1:12345"}, "转发服务地址(支持多次传入)"}
+	frameSize  = Flag{ptrVal{int: &cfg.FrameSize}, "F", "Frame", Val{int: 16}, "帧大小"}
+	parityBit  = Flag{ptrVal{int: &cfg.ParityBit}, "v", "verify", Val{int: 0}, "奇偶校验(0:无校验、1:奇校验、2:偶校验、3:1校验、4:0校验)"}
+	guiMode    = Flag{ptrVal{bool: &cfg.EnableGUI}, "g", "gui", Val{bool: false}, "启用TUI交互界面"}
+	hotkeyMod  = Flag{ptrVal{string: &cfg.HotkeyMod}, "k", "hotkey-mod", Val{string: "ctrl+alt"}, "本地快捷键修饰(ctrl+alt|ctrl+shift)"}
 	flags      = []Flag{portName, baudRate, dataBits, stopBits, outputCode, inputCode, endStr, forWard, address, frameSize, parityBit, logExt, timeExt, guiMode, hotkeyMod}
 )
 
@@ -182,18 +182,18 @@ func flagInit(f *Flag) {
 	}
 }
 func flagExt() {
-	if config.logFilePath != "" {
-		config.enableLog = true
+	if cfg.LogFilePath != "" {
+		cfg.EnableLog = true
 	}
-	if config.timesFmt != "" {
-		config.timesTamp = true
+	if cfg.TimesFmt != "" {
+		cfg.TimesTamp = true
 	}
-	if config.hotkeyMod == "" {
-		config.hotkeyMod = "ctrl+alt"
+	if cfg.HotkeyMod == "" {
+		cfg.HotkeyMod = "ctrl+alt"
 	}
-	config.hotkeyMod = strings.ToLower(strings.TrimSpace(config.hotkeyMod))
-	if config.hotkeyMod != "ctrl+alt" && config.hotkeyMod != "ctrl+shift" {
-		config.hotkeyMod = "ctrl+alt"
+	cfg.HotkeyMod = strings.ToLower(strings.TrimSpace(cfg.HotkeyMod))
+	if cfg.HotkeyMod != "ctrl+alt" && cfg.HotkeyMod != "ctrl+shift" {
+		cfg.HotkeyMod = "ctrl+alt"
 	}
 }
 func getCliFlag() {
@@ -230,7 +230,7 @@ func getCliFlag() {
 		singleselect.WithPageSize(4),
 		singleselect.WithFilterInput(inputs),
 	).Display("选择串口")
-	config.portName = ports[s]
+	cfg.PortName = ports[s]
 
 	s, _ = inf.NewSingleSelect(
 		bauds,
@@ -238,38 +238,38 @@ func getCliFlag() {
 		singleselect.WithPageSize(4),
 	).Display("选择波特率")
 	if s != 0 {
-		config.baudRate, _ = strconv.Atoi(bauds[s])
+		cfg.BaudRate, _ = strconv.Atoi(bauds[s])
 	} else {
 		b, _ := inf.NewText(
 			text.WithPrompt("BaudRate:"),
 			text.WithPromptStyle(theme.DefaultTheme.PromptStyle),
 			text.WithDefaultValue("115200"),
 		).Display()
-		config.baudRate, _ = strconv.Atoi(b)
+		cfg.BaudRate, _ = strconv.Atoi(b)
 	}
 	v, _ := inf.NewConfirmWithSelection(
 		confirm.WithPrompt("启用Hex"),
 	).Display()
 	if v {
-		config.inputCode = "hex"
+		cfg.InputCode = "hex"
 		b, _ := inf.NewText(
 			text.WithPrompt("Frames:"),
 			text.WithPromptStyle(theme.DefaultTheme.PromptStyle),
 			text.WithDefaultValue("16"),
 		).Display()
-		config.frameSize, _ = strconv.Atoi(b)
+		cfg.FrameSize, _ = strconv.Atoi(b)
 	}
 	v, _ = inf.NewConfirmWithSelection(
 		confirm.WithPrompt("启用时间戳"),
 	).Display()
-	config.timesTamp = v
+	cfg.TimesTamp = v
 	if v {
 		b, _ := inf.NewText(
 			text.WithPrompt("格式化字段:"),
 			text.WithPromptStyle(theme.DefaultTheme.PromptStyle),
 			text.WithDefaultValue(timeExt.dv.extdef),
 		).Display()
-		config.timesFmt = b
+		cfg.TimesFmt = b
 	}
 	v, _ = inf.NewConfirmWithSelection(
 		confirm.WithPrompt("启用高级配置"),
@@ -281,7 +281,7 @@ func getCliFlag() {
 			singleselect.WithPageSize(4),
 			singleselect.WithFilterInput(inputs),
 		).Display("选择数据位")
-		config.dataBits, _ = strconv.Atoi(datas[s])
+		cfg.DataBits, _ = strconv.Atoi(datas[s])
 
 		s, _ = inf.NewSingleSelect(
 			stops,
@@ -289,7 +289,7 @@ func getCliFlag() {
 			singleselect.WithPageSize(4),
 			singleselect.WithFilterInput(inputs),
 		).Display("选择停止位")
-		config.stopBits = s
+		cfg.StopBits = s
 
 		s, _ = inf.NewSingleSelect(
 			paritys,
@@ -297,14 +297,14 @@ func getCliFlag() {
 			singleselect.WithPageSize(4),
 			singleselect.WithFilterInput(inputs),
 		).Display("选择校验位")
-		config.parityBit = s
+		cfg.ParityBit = s
 
 		t, _ := inf.NewText(
 			text.WithPrompt("换行符:"),
 			text.WithPromptStyle(theme.DefaultTheme.PromptStyle),
 			text.WithDefaultValue(endStr.dv.string),
 		).Display()
-		config.endStr = t
+		cfg.EndStr = t
 
 		v, _ = inf.NewConfirmWithSelection(
 			confirm.WithDefaultYes(),
@@ -317,14 +317,14 @@ func getCliFlag() {
 				text.WithPromptStyle(theme.DefaultTheme.PromptStyle),
 				text.WithDefaultValue(inputCode.dv.string),
 			).Display()
-			config.inputCode = t
+			cfg.InputCode = t
 
 			t, _ = inf.NewText(
 				text.WithPrompt("输出编码:"),
 				text.WithPromptStyle(theme.DefaultTheme.PromptStyle),
 				text.WithDefaultValue(outputCode.dv.string),
 			).Display()
-			config.outputCode = t
+			cfg.OutputCode = t
 		}
 	G_F_mode:
 		s, _ = inf.NewSingleSelect(
@@ -334,13 +334,13 @@ func getCliFlag() {
 			singleselect.WithFilterInput(inputs),
 		).Display("选择转发模式")
 		if s != 0 {
-			config.forWard = append(config.forWard, s)
+			cfg.ForWard = append(cfg.ForWard, s)
 			t, _ = inf.NewText(
 				text.WithPrompt("地址:"),
 				text.WithPromptStyle(theme.DefaultTheme.PromptStyle),
 				text.WithDefaultValue(address.dv.string),
 			).Display()
-			config.address = append(config.address, t)
+			cfg.Address = append(cfg.Address, t)
 			goto G_F_mode
 		}
 
@@ -348,14 +348,14 @@ func getCliFlag() {
 			confirm.WithDefaultYes(),
 			confirm.WithPrompt("启用日志"),
 		).Display()
-		config.enableLog = e
+		cfg.EnableLog = e
 		if e {
 			t, _ = inf.NewText(
 				text.WithPrompt("Path:"),
 				text.WithPromptStyle(theme.DefaultTheme.PromptStyle),
 				text.WithDefaultValue("./%s-$s.txt"),
 			).Display()
-			config.logFilePath = t
+			cfg.LogFilePath = t
 		}
 	}
 

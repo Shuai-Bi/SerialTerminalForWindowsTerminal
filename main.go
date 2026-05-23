@@ -11,15 +11,14 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/jixishi/SerialTerminalForWindowsTerminal/internal/flag"
 	"github.com/jixishi/SerialTerminalForWindowsTerminal/internal/session"
 	"golang.org/x/term"
 )
 
 func init() {
 	log.SetFlags(log.Ldate | log.Ltime | log.Lshortfile | log.Lmsgprefix)
-	for _, f := range flags {
-		flagInit(&f)
-	}
+	flag.Init(cfg)
 }
 
 func main() {
@@ -30,16 +29,16 @@ func main() {
 		}
 	}()
 
-	normalizeFlags()
+	flag.Normalize()
 	pflag.Parse()
-	flagExt()
+	flag.Ext(cfg)
 	if cfg.PortName == "" {
-		getCliFlag()
+		flag.GetCliFlag(cfg)
 	}
 	ports, err := session.CheckPortAvailability(cfg.PortName)
 	if err != nil {
 		fmt.Println(err)
-		printUsage(ports)
+		flag.PrintUsage(ports)
 		os.Exit(0)
 	}
 

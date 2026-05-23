@@ -240,6 +240,28 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 	}
 
+
+		// Handle CSI u sequences that bubbletea does not parse into KeyMsg
+		if b, ok := msg.([]byte); ok {
+			if key, ok2 := parseCSIuBytes(b); ok2 {
+				keyStr := strings.ToLower(key)
+				if m.showModal {
+					last := rune(key[len(key)-1])
+					fake := tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{last}, Alt: strings.Contains(key, "alt+")}
+					if handled, _ := m.handleModalKey(fake); handled {
+						return m, nil
+					}
+				}
+				if keyStr == normalizeHotkeyPrefix(m.App.Cfg().HotkeyMod)+"+c" {
+					m.App.Close()
+					return m, tea.Quit
+				}
+				if handleLocalHotkey(m, keyStr) {
+					return m, nil
+				}
+			}
+		}
+
 	var cmd tea.Cmd
 	m.input, cmd = m.input.Update(msg)
 	return m, cmd

@@ -66,7 +66,7 @@ func New(cfg *appconfig.Config, sess *session.SerialSession, out io.Writer) (*Ap
 	a.forward = forward.NewManager(a.writeRawToSession, a.Notifyf)
 	a.forward.SetInboundReporter(a.reportForwardIngress)
 	a.dispatcher = command.NewDispatcher(a)
-	if err = a.loadDefaultDemoPlugin(); err != nil {
+	if err = a.loadPluginsFromDir(); err != nil {
 		return nil, err
 	}
 	return a, nil
@@ -91,20 +91,29 @@ func (a *App) LoadConfiguredForwards()          { a.loadConfiguredForwards() }
 func (a *App) Sess() *session.SerialSession    { return a.sess }
 func (a *App) Out() io.Writer                  { return a.out }
 
-func (a *App) loadDefaultDemoPlugin() error {
-	demoPath := filepath.Join("plugins", "demo.lua")
-	if _, err := os.Stat(demoPath); err != nil {
+func (a *App) loadPluginsFromDir() error {
+	entries, err := os.ReadDir("plugins")
+	if err != nil {
 		if os.IsNotExist(err) {
 			return nil
 		}
 		return err
 	}
 
-	name, err := a.plugins.Load(demoPath)
-	if err != nil {
-		return err
+	for _, entry := range entries {
+		if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".lua") {
+			continue
+		}
+		pluginPath := filepath.Join("plugins", entry.Name())
+		name, loadErr := a.plugins.Load(pluginPath)
+		if loadErr != nil {
+			a.Notifyf("[plugin] load %s failed: %v", entry.Name(), loadErr)
+			continue
+		}
+		// Disable by default; user enables via .plugin enable or TUI panel
+		_ = a.plugins.Disable(name)
 	}
-	return a.plugins.Disable(name)
+	return nil
 }
 
 func (a *App) Notifyf(format string, args ...any) {

@@ -65,8 +65,7 @@ func Run() {
 
 	if cfg.EnableGUI {
 		model := tui.New(appInst)
-		p := tea.NewProgram(model, tea.WithAltScreen(), tea.WithoutSignalHandler())
-		enableVTInput(int(os.Stdin.Fd())) // Restore VT input for Ctrl+Alt+Key hotkeys
+		p := tea.NewProgram(model, tea.WithAltScreen(), tea.WithInputTTY(), tea.WithoutSignalHandler())
 		if _, err = p.Run(); err != nil {
 			fmt.Fprintf(os.Stderr, "tui failed: %v\n", err)
 			os.Exit(1)

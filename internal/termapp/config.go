@@ -1,4 +1,4 @@
-package main
+package termapp
 
 import (
 	appconfig "github.com/jixishi/SerialTerminalForWindowsTerminal/internal/config"

@@ -1,4 +1,4 @@
-package main
+package termapp
 
 import (
 	"encoding/hex"

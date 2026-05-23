@@ -1,4 +1,4 @@
-package main
+package termapp
 
 import (
 	"fmt"
@@ -21,7 +21,7 @@ func init() {
 	flag.Init(cfg)
 }
 
-func main() {
+func Run() {
 	defer func() {
 		if r := recover(); r != nil {
 			fmt.Fprintf(os.Stderr, "fatal: %v\n", r)

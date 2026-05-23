@@ -1,5 +1,5 @@
 //go:build !windows
 
-package main
+package termapp
 
 func enableVTInput(fd int) {}

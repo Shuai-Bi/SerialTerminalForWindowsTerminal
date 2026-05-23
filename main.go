@@ -11,6 +11,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/jixishi/SerialTerminalForWindowsTerminal/internal/session"
 	"golang.org/x/term"
 )
 
@@ -35,20 +36,16 @@ func main() {
 	if cfg.PortName == "" {
 		getCliFlag()
 	}
-	ports, err := checkPortAvailability(cfg.PortName)
+	ports, err := session.CheckPortAvailability(cfg.PortName)
 	if err != nil {
 		fmt.Println(err)
 		printUsage(ports)
 		os.Exit(0)
 	}
 
-	if err = OpenSerial(); err != nil {
-		fmt.Fprintf(os.Stderr, "open serial failed: %v\n", err)
-		os.Exit(1)
-	}
-
-	if err = OpenTrzsz(); err != nil {
-		fmt.Fprintf(os.Stderr, "open trzsz failed: %v\n", err)
+	sess, err = session.Open(cfg)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "open session failed: %v\n", err)
 		os.Exit(1)
 	}
 

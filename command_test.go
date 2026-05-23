@@ -6,13 +6,17 @@ import (
 	"testing"
 
 	"github.com/jixishi/SerialTerminalForWindowsTerminal/internal/event"
+	"github.com/jixishi/SerialTerminalForWindowsTerminal/internal/session"
 	"github.com/jixishi/SerialTerminalForWindowsTerminal/pkg/forward"
 	"github.com/jixishi/SerialTerminalForWindowsTerminal/pkg/luaplugin"
 )
 
 func setupTestPipes() {
+	if sess == nil {
+		sess = &session.SerialSession{}
+	}
 	var cr *io.PipeReader
-	cr, stdinPipe = io.Pipe()
+	cr, sess.StdinPipe = io.Pipe()
 	go func() {
 		buf := make([]byte, 4096)
 		for {

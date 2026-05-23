@@ -156,8 +156,8 @@ func (a *App) Close() {
 		close(a.done)
 		a.forward.Close()
 		a.plugins.Close()
-		CloseTrzsz()
-		CloseSerial()
+		sess.Close()
+		
 		if a.logFile != nil {
 			_ = a.logFile.Close()
 		}
@@ -216,7 +216,7 @@ func (a *App) writeRawToSession(data []byte) error {
 
 	a.stdinMu.Lock()
 	defer a.stdinMu.Unlock()
-	_, err := stdinPipe.Write(data)
+	_, err := sess.StdinPipe.Write(data)
 	return err
 }
 
@@ -246,7 +246,7 @@ func (a *App) sendCtrl(letter byte) error {
 		letter = letter + ('a' - 'A')
 	}
 	control := []byte{letter & 0x1f}
-	_, err := serialPort.Write(control)
+	_, err := sess.Port.Write(control)
 	return err
 }
 
@@ -300,7 +300,7 @@ func (a *App) readHexOutput() {
 
 	buf := make([]byte, frameSize)
 	for {
-		n, err := stdoutPipe.Read(buf)
+		n, err := sess.StdoutPipe.Read(buf)
 		if n > 0 {
 			chunk := make([]byte, n)
 			copy(chunk, buf[:n])
@@ -333,7 +333,7 @@ func (a *App) readHexOutput() {
 func (a *App) readTextOutput() {
 	buf := make([]byte, 4096)
 	for {
-		n, err := stdoutPipe.Read(buf)
+		n, err := sess.StdoutPipe.Read(buf)
 		if n > 0 {
 			chunk := make([]byte, n)
 			copy(chunk, buf[:n])

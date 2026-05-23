@@ -1,18 +1,13 @@
 package main
 
 import (
-	"github.com/trzsz/trzsz-go/trzsz"
-	"go.bug.st/serial"
 	"io"
 	"os"
+
+	"github.com/jixishi/SerialTerminalForWindowsTerminal/internal/session"
 )
 
 var (
-	serialPort  serial.Port
-	out         io.Writer = os.Stdout
-	trzszFilter *trzsz.TrzszFilter
-	clientIn    *io.PipeReader
-	stdoutPipe  *io.PipeReader
-	stdinPipe   *io.PipeWriter
-	clientOut   *io.PipeWriter
+	sess *session.SerialSession
+	out  io.Writer = os.Stdout
 )

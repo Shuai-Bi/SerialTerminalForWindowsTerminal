@@ -9,6 +9,7 @@ import (
 	"go.bug.st/serial"
 
 	"github.com/jixishi/SerialTerminalForWindowsTerminal/internal/event"
+	"github.com/jixishi/SerialTerminalForWindowsTerminal/internal/session"
 	"github.com/jixishi/SerialTerminalForWindowsTerminal/pkg/forward"
 	"github.com/jixishi/SerialTerminalForWindowsTerminal/pkg/luaplugin"
 )
@@ -204,11 +205,14 @@ func TestReportForwardIngress(t *testing.T) {
 }
 
 func TestSendCtrl(t *testing.T) {
-	oldSp := serialPort
-	defer func() { serialPort = oldSp }()
+	if sess == nil {
+		sess = &session.SerialSession{}
+	}
+	oldSp := sess.Port
+	defer func() { sess.Port = oldSp }()
 
 	// Use a mock serial port
-	serialPort = &mockSerialPort{}
+	sess.Port = &mockSerialPort{}
 	a := &App{
 		cfg:      &Config{},
 		uiEvents: make(chan event.UIEvent, 4),

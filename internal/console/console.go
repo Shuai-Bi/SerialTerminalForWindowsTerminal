@@ -259,8 +259,26 @@ func RunConsole(appInst *apppkg.App) error {
 					appInst.Notifyf("%s", strings.Join(cands, "  "))
 					echoConsoleByte(out, '.')
 					echoConsoleString(out, string(cmdBuf[1:]))
+				} else {
+					commandMode = false
+					data := append([]byte(string(cmdBuf)), 0x09)
+					if err = appInst.WriteToSession(data); err != nil {
+						appInst.Statusf("[send] %v", err)
+					}
+					cmdBuf = cmdBuf[:0]
+					lineStart = false
 				}
 			default:
+				if len(cmdBuf) == 1 && cmdBuf[0] == '.' && (b == '/' || b == '\\') {
+					commandMode = false
+					echoConsoleBackspace(out)
+					if err = appInst.WriteToSession([]byte{'.', b}); err != nil {
+						appInst.Statusf("[send] %v", err)
+					}
+					cmdBuf = cmdBuf[:0]
+					lineStart = false
+					continue
+				}
 				cmdBuf = append(cmdBuf, b)
 				echoConsoleByte(out, b)
 			}
@@ -268,6 +286,20 @@ func RunConsole(appInst *apppkg.App) error {
 		}
 
 		if lineStart && b == '.' {
+			if b2, ok := tryRead(); ok {
+				if b2 == '/' || b2 == '\\' {
+					if err = appInst.WriteToSession([]byte{'.', b2}); err != nil {
+						appInst.Statusf("[send] %v", err)
+					}
+					lineStart = false
+					continue
+				}
+				commandMode = true
+				cmdBuf = append(cmdBuf[:0], '.', b2)
+				echoConsoleByte(out, '.')
+				echoConsoleByte(out, b2)
+				continue
+			}
 			commandMode = true
 			cmdBuf = append(cmdBuf[:0], b)
 			echoConsoleByte(out, b)

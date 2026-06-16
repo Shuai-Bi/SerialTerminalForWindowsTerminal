@@ -212,6 +212,13 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			line, cands := m.App.Dispatcher().Complete(m.input.Value())
 			m.suggestions = cands
 			if len(cands) == 0 {
+				if strings.HasPrefix(strings.TrimSpace(m.input.Value()), ".") {
+					data := append([]byte(m.input.Value()), '\t')
+					if err := m.App.WriteToSession(data); err != nil {
+						m.App.Statusf("[send] %v", err)
+					}
+					m.input.SetValue("")
+				}
 				return m, nil
 			}
 			if len(cands) == 1 {

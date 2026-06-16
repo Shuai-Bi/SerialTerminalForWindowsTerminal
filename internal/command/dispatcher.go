@@ -135,7 +135,7 @@ func (d *Dispatcher) Execute(line string) (bool, error) {
 
 	cmd, ok := d.commands[strings.ToLower(args[0])]
 	if !ok {
-		return true, fmt.Errorf("unknown command: %s", args[0])
+		return false, nil
 	}
 
 	if err := cmd.Handler(args); err != nil {

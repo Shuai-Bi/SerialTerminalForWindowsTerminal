@@ -213,11 +213,17 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.suggestions = cands
 			if len(cands) == 0 {
 				if strings.HasPrefix(strings.TrimSpace(m.input.Value()), ".") {
-					data := append([]byte(m.input.Value()), '\t')
-					if err := m.App.WriteToSession(data); err != nil {
-						m.App.Statusf("[send] %v", err)
+					if cands != nil {
+						if !strings.HasSuffix(m.input.Value(), " ") {
+							m.input.SetValue(m.input.Value() + " ")
+						}
+					} else {
+						data := append([]byte(m.input.Value()), '\t')
+						if err := m.App.WriteToSession(data); err != nil {
+							m.App.Statusf("[send] %v", err)
+						}
+						m.input.SetValue("")
 					}
-					m.input.SetValue("")
 				}
 				return m, nil
 			}

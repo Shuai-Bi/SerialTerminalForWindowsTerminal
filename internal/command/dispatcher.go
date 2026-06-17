@@ -179,8 +179,11 @@ func (d *Dispatcher) Complete(line string) (string, []string) {
 
 	cmdName := strings.ToLower(args[0])
 	cmd, ok := d.commands[cmdName]
-	if !ok || cmd.Completer == nil {
+	if !ok {
 		return line, nil
+	}
+	if cmd.Completer == nil {
+		return line, []string{}
 	}
 
 	compArgs := args
